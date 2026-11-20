@@ -35,9 +35,9 @@ export const BottomBar: React.FC<BottomBarProps> = ({
   return (
     <nav
       aria-label="Barre de navigation inférieure"
-      className="shrink-0 relative z-40 w-full bg-white dark:bg-[#0B172B] border-t border-[#E3EDF0] dark:border-[#1E3354] shadow-[0_-8px_24px_-14px_rgba(22,38,66,0.14)] dark:shadow-[0_-10px_28px_-14px_rgba(2,8,20,0.7)] transition-colors no-print"
+      className="shrink-0 relative z-40 w-full bg-white/95 dark:bg-[#0B1322]/95 backdrop-blur-md border-t border-[#E1E8EE] dark:border-[#1B2A42] transition-colors no-print md:hidden"
     >
-      <div className="max-w-xl mx-auto grid grid-cols-4 h-16 px-2">
+      <div className="max-w-xl mx-auto grid grid-cols-4 h-15 px-2">
         {navItems.map(({ id, label, Icon }) => {
           const isActive = activePage === id;
           const showBufferCount = id === 'device' && isOutOfRange && bufferedCount > 0;
@@ -48,23 +48,23 @@ export const BottomBar: React.FC<BottomBarProps> = ({
               type="button"
               onClick={() => onSelectPage(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`relative min-h-[48px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D9488] rounded-xl ${
+              className={`relative min-h-[44px] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0B8A7E] rounded-lg ${
                 isActive
-                  ? 'text-[#0D9488] dark:text-[#2DD4BF]'
-                  : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                  ? 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+                  : 'text-[#64798F] dark:text-[#8DA2B9] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
               }`}
             >
               <span className="relative inline-flex items-center justify-center">
                 <Icon className="w-5 h-5" aria-hidden={true} />
                 {showBufferCount && (
-                  <span className="absolute -top-1.5 -right-3 min-w-[16px] h-4 px-1 rounded-full bg-[#EA580C] text-white font-mono text-[10px] font-bold flex items-center justify-center tabular-nums">
+                  <span className="absolute -top-1.5 -end-3 min-w-[16px] h-4 px-1 rounded-md bg-[#D97706] text-white font-mono text-[10px] font-bold flex items-center justify-center tabular-nums">
                     {bufferedCount}
                   </span>
                 )}
               </span>
               <span
                 className={`text-[11px] leading-none tracking-tight whitespace-nowrap ${
-                  isActive ? 'font-bold text-[#162642] dark:text-[#F1F6FA]' : 'font-medium'
+                  isActive ? 'font-bold text-[#0F1D32] dark:text-[#F1F5F9]' : 'font-medium'
                 }`}
               >
                 {label}
@@ -72,7 +72,7 @@ export const BottomBar: React.FC<BottomBarProps> = ({
               {isActive && (
                 <span
                   aria-hidden="true"
-                  className="absolute bottom-1 w-6 h-0.5 rounded-full bg-[#0D9488] dark:bg-[#2DD4BF]"
+                  className="absolute top-0 w-8 h-[2px] bg-[#0B8A7E] dark:bg-[#2DD4BF]"
                 />
               )}
             </button>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Activity,
   AlertCircle,
+  Check,
   ClipboardPlus,
   FileText,
   Moon,
@@ -47,45 +48,45 @@ function getNoteIcon(category: NotePresetCategory) {
     case 'Antipyrétique administré':
       return {
         Icon: Pill,
-        bg: 'bg-[#FFF3F0] dark:bg-[#311E1B]',
-        text: 'text-[#EA580C] dark:text-[#FB923C]',
+        bg: 'bg-[#FEF7EC] dark:bg-[#261909]',
+        text: 'text-[#D97706] dark:text-[#FB923C]',
       };
     case 'Compresses tièdes':
       return {
         Icon: Snowflake,
-        bg: 'bg-[#EFF8FB] dark:bg-[#132C46]',
+        bg: 'bg-[#EEF6FB] dark:bg-[#112238]',
         text: 'text-[#0284C7] dark:text-[#38BDF8]',
       };
     case 'Fatigue / léthargie':
       return {
         Icon: Moon,
-        bg: 'bg-[#F5F3FF] dark:bg-[#241B40]',
+        bg: 'bg-[#F3F0FF] dark:bg-[#1F1638]',
         text: 'text-[#6D28D9] dark:text-[#C4B5FD]',
       };
     case 'Vomissements':
     case 'Douleur / pleurs':
       return {
         Icon: AlertCircle,
-        bg: 'bg-[#FFF1F2] dark:bg-[#2F1320]',
-        text: 'text-[#E11D48] dark:text-[#FDA4AF]',
+        bg: 'bg-[#FEF1F3] dark:bg-[#2A0E17]',
+        text: 'text-[#D91E43] dark:text-[#FDA4AF]',
       };
     case 'Mesure de référence':
       return {
         Icon: Thermometer,
-        bg: 'bg-[#EEF2FF] dark:bg-[#1E1B4B]',
+        bg: 'bg-[#EEF2FF] dark:bg-[#1B1842]',
         text: 'text-[#4338CA] dark:text-[#A5B4FC]',
       };
     case 'Session clôturée':
       return {
         Icon: Power,
-        bg: 'bg-[#F3F7F9] dark:bg-[#162947]',
-        text: 'text-[#647B8C] dark:text-[#8BA3BC]',
+        bg: 'bg-[#F8FAFC] dark:bg-[#132036]',
+        text: 'text-[#64798F] dark:text-[#8DA2B9]',
       };
     default:
       return {
         Icon: Activity,
-        bg: 'bg-[#F0FDFA] dark:bg-[#0D2B2C]',
-        text: 'text-[#0D9488] dark:text-[#5EEAD4]',
+        bg: 'bg-[#EDF9F7] dark:bg-[#0A2624]',
+        text: 'text-[#0B8A7E] dark:text-[#5EEAD4]',
       };
   }
 }
@@ -113,6 +114,13 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
   const [showComposer, setShowComposer] = useState(false);
   const [showRefQuick, setShowRefQuick] = useState(false);
   const [activeTab, setActiveTab] = useState<'notes' | 'horaires'>('notes');
+  const [recentAddedLabel, setRecentAddedLabel] = useState<string | null>(null);
+
+  const handleQuickPreset = (category: NotePresetCategory, text: string, label: string) => {
+    onAddNote(category, text);
+    setRecentAddedLabel(label);
+    setTimeout(() => setRecentAddedLabel(null), 1800);
+  };
 
   const handleSubmitCustom = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,10 +171,10 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
       <div>
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC]">
+            <p className="text-xs font-medium text-[#64798F] dark:text-[#8DA2B9]">
               {m.subtitle}
             </p>
-            <h2 className="text-lg font-bold text-[#162642] dark:text-[#F1F6FA]">
+            <h2 className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
               {m.title}
             </h2>
           </div>
@@ -174,21 +182,21 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
           <button
             type="button"
             onClick={onOpenReport}
-            className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors whitespace-nowrap cursor-pointer"
+            className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EFF4F8] border border-[#E1E8EE] dark:text-[#E2ECF5] dark:bg-[#132036] dark:hover:bg-[#192A46] dark:border-[#1E304D] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
           >
-            <FileText className="w-3.5 h-3.5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+            <FileText className="w-3.5 h-3.5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
             <span>{m.summaryBtn}</span>
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-1 p-1 bg-[#F3F7F9] dark:bg-[#0B172B] rounded-full border border-[#E6EFF2] dark:border-[#1E3354]">
+        <div className="mt-4 grid grid-cols-2 gap-1 p-1 bg-[#F8FAFC] dark:bg-[#09111E] rounded-xl border border-[#E1E8EE] dark:border-[#1B2A42]">
           <button
             type="button"
             onClick={() => setActiveTab('notes')}
-            className={`min-h-[36px] text-xs font-semibold rounded-full transition-colors cursor-pointer ${
+            className={`min-h-[34px] text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
               activeTab === 'notes'
-                ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                : 'text-[#64798F] dark:text-[#8DA2B9] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
             }`}
           >
             {m.tabNotes} ({sortedNotes.length})
@@ -196,10 +204,10 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('horaires')}
-            className={`min-h-[36px] text-xs font-semibold rounded-full transition-colors cursor-pointer ${
+            className={`min-h-[34px] text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
               activeTab === 'horaires'
-                ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                : 'text-[#64798F] dark:text-[#8DA2B9] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
             }`}
           >
             {m.tabHourly}
@@ -214,8 +222,10 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
               <button
                 key={preset.label}
                 type="button"
-                onClick={() => onAddNote(preset.category, preset.defaultText)}
-                className="min-h-[34px] px-2.5 py-1 text-[11px] font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E2EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors whitespace-nowrap cursor-pointer"
+                onClick={() =>
+                  handleQuickPreset(preset.category, preset.defaultText, preset.label)
+                }
+                className="min-h-[32px] px-2.5 py-1 text-[11px] font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EDF9F7] hover:text-[#087066] border border-[#E1E8EE] hover:border-[#BEEAE4] dark:text-[#E2ECF5] dark:bg-[#09111E] dark:hover:bg-[#0A2624] dark:border-[#1B2A42] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
               >
                 + {preset.label}
               </button>
@@ -226,7 +236,7 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                 setRefTempInput(String(convertTemp(currentTemp, tempUnit)));
                 setShowRefQuick((v) => !v);
               }}
-              className="min-h-[34px] inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#4338CA] bg-[#EEF2FF] hover:bg-[#E0E7FF] border border-[#C7D2FE] dark:text-[#A5B4FC] dark:bg-[#1E1B4B] dark:hover:bg-[#272361] dark:border-[#3730A3] rounded-full transition-colors whitespace-nowrap cursor-pointer"
+              className="min-h-[32px] inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#4338CA] bg-[#EEF2FF] hover:bg-[#E0E7FF] border border-[#C7D2FE] dark:text-[#A5B4FC] dark:bg-[#1B1842] dark:hover:bg-[#242058] dark:border-[#3730A3] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
             >
               <Thermometer className="w-3 h-3" aria-hidden="true" />
               <span>
@@ -235,10 +245,17 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
             </button>
           </div>
 
+          {recentAddedLabel && (
+            <div className="px-3 py-1.5 rounded-lg bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] text-[11px] font-semibold text-[#087066] dark:text-[#5EEAD4] flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{recentAddedLabel} ✓</span>
+            </div>
+          )}
+
           {showRefQuick && (
             <form
               onSubmit={handleSaveQuickReference}
-              className="p-3 rounded-2xl bg-[#EEF2FF] border border-[#C7D2FE] dark:bg-[#1E1B4B] dark:border-[#3730A3] flex flex-wrap items-center gap-2"
+              className="p-3 rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] dark:bg-[#1B1842] dark:border-[#3730A3] flex flex-wrap items-center gap-2"
             >
               <label
                 htmlFor="quick-ref-temp"
@@ -255,11 +272,11 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                 value={refTempInput}
                 onChange={(e) => setRefTempInput(e.target.value)}
                 required
-                className="w-24 min-h-[34px] px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-white text-[#162642] border border-[#C7D2FE] dark:bg-[#132544] dark:text-[#F1F6FA] dark:border-[#4338CA]"
+                className="w-24 min-h-[34px] px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-white text-[#0F1D32] border border-[#C7D2FE] dark:bg-[#0D1626] dark:text-[#F1F5F9] dark:border-[#4338CA]"
               />
               <button
                 type="submit"
-                className="min-h-[34px] px-3 py-1 rounded-full bg-[#4338CA] hover:bg-[#3730A3] text-white text-xs font-semibold cursor-pointer"
+                className="min-h-[34px] px-3 py-1 rounded-lg bg-[#4338CA] hover:bg-[#3730A3] text-white text-xs font-semibold cursor-pointer"
               >
                 {pCopy.refTempSaveBtn}
               </button>
@@ -276,13 +293,13 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
           {showComposer && (
             <form
               onSubmit={handleSubmitCustom}
-              className="p-3 rounded-2xl bg-[#F7FAFB] border border-[#E2ECF0] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-2.5"
+              className="p-3 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-2.5"
             >
               <select
                 aria-label="Catégorie clinique"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value as NotePresetCategory)}
-                className="w-full min-h-[38px] px-3 py-1.5 text-xs font-medium text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#132544] dark:border-[#243E63] rounded-xl"
+                className="w-full min-h-[38px] px-3 py-1.5 text-xs font-medium text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
               >
                 {m.quickTags.map((tag) => (
                   <option key={tag.label} value={tag.category}>
@@ -290,10 +307,18 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                   </option>
                 ))}
                 <option value="Mesure de référence">{pCopy.refTempInputLabel}</option>
-                <option value="Vomissements">Vomissements</option>
-                <option value="Douleur / pleurs">Douleur / pleurs</option>
-                <option value="Hydratation / boisson">Hydratation / boisson</option>
-                <option value="Observation">Observation</option>
+                <option value="Vomissements">
+                  {language === 'ar' ? 'قيء أو غثيان' : 'Vomissements'}
+                </option>
+                <option value="Douleur / pleurs">
+                  {language === 'ar' ? 'ألم أو بكاء مستمر' : 'Douleur / pleurs'}
+                </option>
+                <option value="Hydratation / boisson">
+                  {language === 'ar' ? 'ترطيب / شرب سوائل' : 'Hydratation / boisson'}
+                </option>
+                <option value="Observation">
+                  {language === 'ar' ? 'ملاحظة سريرية' : 'Observation'}
+                </option>
               </select>
               {selectedCategory === 'Mesure de référence' && (
                 <input
@@ -304,7 +329,7 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                   value={refTempInput}
                   onChange={(e) => setRefTempInput(e.target.value)}
                   placeholder={`${pCopy.refTempInputLabel} (${unitSuffix})`}
-                  className="w-full min-h-[38px] px-3 py-1.5 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#132544] dark:border-[#243E63] rounded-xl"
+                  className="w-full min-h-[38px] px-3 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                 />
               )}
               <input
@@ -312,20 +337,20 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
                 placeholder={`${profileName} (${formatTempFr(currentTemp, tempUnit, language)} °${tempUnit})...`}
-                className="w-full min-h-[38px] px-3 py-1.5 text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#132544] dark:border-[#243E63] dark:placeholder:text-[#7B95AF] rounded-xl"
+                className="w-full min-h-[38px] px-3 py-1.5 text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] dark:placeholder:text-[#6B849E] rounded-lg"
               />
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowComposer(false)}
-                  className="px-3 py-1 text-xs text-[#647B8C] dark:text-[#94ACC4] cursor-pointer"
+                  className="px-3 py-1 text-xs text-[#64798F] dark:text-[#9DB0C6] cursor-pointer"
                 >
                   {m.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={!customText.trim()}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-white bg-[#0D9488] rounded-full disabled:opacity-45 cursor-pointer"
+                  className="px-3.5 py-1.5 text-xs font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] rounded-lg disabled:opacity-45 cursor-pointer"
                 >
                   {m.save}
                 </button>
@@ -333,9 +358,9 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
             </form>
           )}
 
-          <div className="divide-y divide-[#EFF4F6] dark:divide-[#1E3354] max-h-[260px] overflow-y-auto pr-1">
+          <div className="divide-y divide-[#E1E8EE] dark:divide-[#1B2A42] max-h-[260px] overflow-y-auto pe-1">
             {sortedNotes.length === 0 ? (
-              <p className="py-8 text-center text-xs text-[#647B8C] dark:text-[#8BA3BC]">
+              <p className="py-8 text-center text-xs text-[#64798F] dark:text-[#8DA2B9]">
                 {m.empty}
               </p>
             ) : (
@@ -344,29 +369,39 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                 return (
                   <div key={note.id} className="py-3 flex items-start gap-3">
                     <div
-                      className={`w-8 h-8 rounded-full ${bg} ${text} flex items-center justify-center shrink-0 mt-0.5`}
+                      className={`w-8 h-8 rounded-lg ${bg} ${text} flex items-center justify-center shrink-0 mt-0.5`}
                     >
                       <Icon className="w-4 h-4" aria-hidden="true" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 text-[11px] text-[#647B8C] dark:text-[#8BA3BC] tabular-nums">
-                        <span className="font-mono">{formatTimeFr(note.timestamp)}</span>
-                        <span className="font-mono font-bold text-[#162642] dark:text-[#F1F6FA]">
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-[#64798F] dark:text-[#8DA2B9] tabular-nums">
+                        <span className="font-mono">{formatTimeFr(note.timestamp, language)}</span>
+                        <span className="font-mono font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
                           {formatTempFr(note.temperatureAtTime, tempUnit, language)} °{tempUnit}
                         </span>
                       </div>
-                      <p className="text-xs font-bold text-[#162642] dark:text-[#F1F6FA] mt-0.5 truncate">
+                      <p className="text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9] mt-0.5 truncate">
                         {note.category}
                       </p>
-                      <p className="text-xs text-[#526675] dark:text-[#94ACC4] leading-relaxed mt-0.5">
+                      <p className="text-xs text-[#475B70] dark:text-[#9DB0C6] leading-relaxed mt-0.5">
                         {note.text}
                       </p>
+                      {typeof note.referenceTemp === 'number' && (
+                        <p className="text-[11px] font-mono font-semibold text-[#4338CA] dark:text-[#A5B4FC] mt-0.5">
+                          {language === 'ar' ? 'القياس المرجعي:' : 'Réf. :'}{' '}
+                          {formatTempFr(note.referenceTemp, tempUnit, language)} {unitSuffix}
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
                       onClick={() => onDeleteNote(note.id)}
-                      aria-label={`Supprimer ${note.category}`}
-                      className="text-[#94A7B6] hover:text-[#E11D48] dark:text-[#6B849E] dark:hover:text-[#FDA4AF] p-1 cursor-pointer shrink-0"
+                      aria-label={
+                        language === 'ar'
+                          ? `حذف ${note.category}`
+                          : `Supprimer ${note.category}`
+                      }
+                      className="text-[#8DA2B9] hover:text-[#D91E43] dark:text-[#6B849E] dark:hover:text-[#FDA4AF] p-1 cursor-pointer shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
@@ -377,19 +412,19 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex-1 divide-y divide-[#EFF4F6] dark:divide-[#1E3354] max-h-[300px] overflow-y-auto pr-1">
+        <div className="flex-1 divide-y divide-[#E1E8EE] dark:divide-[#1B2A42] max-h-[300px] overflow-y-auto pe-1">
           {recentReadings.map((reading) => {
             const st = getTemperatureStatus(reading.value, threshold);
             const meta = getStatusMeta(st, language);
             return (
               <div key={reading.id} className="py-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs font-semibold text-[#647B8C] dark:text-[#8BA3BC] tabular-nums w-12">
-                    {formatTimeFr(reading.timestamp)}
+                  <span className="font-mono text-xs font-semibold text-[#64798F] dark:text-[#8DA2B9] tabular-nums w-12">
+                    {formatTimeFr(reading.timestamp, language)}
                   </span>
                   <div>
                     <p className={`text-xs font-bold ${meta.textClass}`}>{meta.label}</p>
-                    <p className="text-[11px] text-[#647B8C] dark:text-[#8BA3BC]">
+                    <p className="text-[11px] text-[#64798F] dark:text-[#8DA2B9]">
                       {reading.source === 'buffered_sync'
                         ? language === 'ar'
                           ? 'مزامنة من الذاكرة الداخلية'
@@ -404,7 +439,7 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
                     </p>
                   </div>
                 </div>
-                <span className="font-mono text-sm font-bold text-[#162642] dark:text-[#F1F6FA] tabular-nums">
+                <span className="font-mono text-sm font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
                   {formatTempFr(reading.value, tempUnit, language)} °{tempUnit}
                 </span>
               </div>
@@ -414,7 +449,7 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
       )}
 
       <div className="space-y-2.5">
-        <p className="text-[11px] text-[#647B8C] dark:text-[#8BA3BC] leading-relaxed">
+        <p className="text-[11px] text-[#64798F] dark:text-[#7B91A8] leading-relaxed">
           {language === 'ar'
             ? 'الحالة العامة للطفل وتوجيه الطبيب أهم دائماً من رقم منفرد.'
             : "L'état général de l'enfant et l'avis médical priment toujours sur un chiffre isolé."}
@@ -426,7 +461,7 @@ export const MedicalNotesPanel: React.FC<MedicalNotesPanelProps> = ({
             setActiveTab('notes');
             setShowComposer((v) => !v);
           }}
-          className="min-h-[44px] w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] border border-[#99F6E4] dark:text-[#5EEAD4] dark:bg-[#0D2B2C] dark:hover:bg-[#12383A] dark:border-[#134E4A] rounded-full transition-colors cursor-pointer"
+          className="min-h-[42px] w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#DFF3F0] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:hover:bg-[#113936] dark:border-[#134E4A] rounded-xl transition-colors cursor-pointer"
         >
           <ClipboardPlus className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span>{m.addCustom}</span>

@@ -172,9 +172,9 @@ export function getStatusMeta(
         lang === 'ar'
           ? 'يرجى الانتظار دقيقتين لاستقرار المستشعر'
           : 'Veuillez patienter 2 minutes',
-      surfaceClass: 'bg-[#EFF6FF] dark:bg-[#132544]',
+      surfaceClass: 'bg-[#EEF5FF] dark:bg-[#0F203B]',
       textClass: 'text-[#1D4ED8] dark:text-[#93C5FD]',
-      borderClass: 'border-[#BFDBFE] dark:border-[#1E40AF]',
+      borderClass: 'border-[#C7DDFF] dark:border-[#1E3A6E]',
       accentHex: '#60A5FA',
       ringEndHex: '#2563EB',
     };
@@ -189,10 +189,10 @@ export function getStatusMeta(
         lang === 'ar'
           ? `فوق العتبة منذ ${elapsed} د (يُؤكَّد التنبيه عند ${req} د لتفادي الإنذار الكاذب)`
           : `Au-dessus du seuil depuis ${elapsed} min (confirmation à ${req} min)`,
-      surfaceClass: 'bg-[#FFFBEB] dark:bg-[#2C1F12]',
+      surfaceClass: 'bg-[#FEF7EC] dark:bg-[#261909]',
       textClass: 'text-[#B45309] dark:text-[#FCD34D]',
-      borderClass: 'border-[#FDE68A] dark:border-[#78350F]',
-      accentHex: '#FCD34D',
+      borderClass: 'border-[#FCDCA8] dark:border-[#78350F]',
+      accentHex: '#FBBF24',
       ringEndHex: '#D97706',
     };
   }
@@ -205,11 +205,11 @@ export function getStatusMeta(
           lang === 'ar'
             ? 'يُنصح بالتحقق بميزان مرجعي ومراجعة الطبيب عند الحاجة'
             : 'Vérifier avec un thermomètre de référence et consulter si nécessaire',
-        surfaceClass: 'bg-[#FFF1F2] dark:bg-[#2F1320]',
+        surfaceClass: 'bg-[#FEF1F3] dark:bg-[#2A0E17]',
         textClass: 'text-[#BE123C] dark:text-[#FDA4AF]',
-        borderClass: 'border-[#FECDD3] dark:border-[#881337]',
+        borderClass: 'border-[#FCCAD3] dark:border-[#881337]',
         accentHex: '#FB7185',
-        ringEndHex: '#E11D48',
+        ringEndHex: '#D91E43',
       };
     }
     case 'elevated':
@@ -219,10 +219,10 @@ export function getStatusMeta(
           lang === 'ar'
             ? 'يُنصح بالمراقبة وتخفيف الغطاء إن لزم'
             : 'Surveillance recommandée, alléger la couverture si besoin',
-        surfaceClass: 'bg-[#FFFBEB] dark:bg-[#2C1C12]',
+        surfaceClass: 'bg-[#FEF7EC] dark:bg-[#261909]',
         textClass: 'text-[#B45309] dark:text-[#FCD34D]',
-        borderClass: 'border-[#FDE68A] dark:border-[#7C2D12]',
-        accentHex: '#FCD34D',
+        borderClass: 'border-[#FCDCA8] dark:border-[#78350F]',
+        accentHex: '#FBBF24',
         ringEndHex: '#D97706',
       };
     case 'normal':
@@ -233,11 +233,11 @@ export function getStatusMeta(
           lang === 'ar'
             ? 'ضمن النطاق المعتاد'
             : 'Dans la plage habituelle',
-        surfaceClass: 'bg-[#F0FDFA] dark:bg-[#0D2B2C]',
-        textClass: 'text-[#0F766E] dark:text-[#5EEAD4]',
-        borderClass: 'border-[#CCFBF1] dark:border-[#115E59]',
+        surfaceClass: 'bg-[#EDF9F7] dark:bg-[#0A2624]',
+        textClass: 'text-[#087066] dark:text-[#5EEAD4]',
+        borderClass: 'border-[#BEEAE4] dark:border-[#134E4A]',
         accentHex: '#2DD4BF',
-        ringEndHex: '#0D9488',
+        ringEndHex: '#0B8A7E',
       };
   }
 }

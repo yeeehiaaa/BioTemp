@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Check, RefreshCw, ShieldCheck, X } from 'lucide-react';
-import { ChildProfile } from '../types/biotemp';
+import { AppLanguage, ChildProfile } from '../types/biotemp';
 
 interface ReplaceDeviceModalProps {
   isOpen: boolean;
+  language?: AppLanguage;
   profile: ChildProfile;
   onClose: () => void;
   onConfirmReplace: (
@@ -15,18 +16,20 @@ interface ReplaceDeviceModalProps {
 
 const SUGGESTED_MODULES = ['BT-CORE-04', 'BT-CORE-07', 'BT-CORE-09'];
 
-const PATCH_OPTIONS = [
-  'Patch Nourrisson (0–24 mois)',
-  'Patch Enfant (2–5 ans)',
-  'Patch Confort (+5 ans)',
+const PATCH_OPTIONS: Array<{ value: string; labelAr: string }> = [
+  { value: 'Patch Nourrisson (0–24 mois)', labelAr: 'لاصقة الرضّع (0–24 شهراً)' },
+  { value: 'Patch Enfant (2–5 ans)', labelAr: 'لاصقة الأطفال (2–5 سنوات)' },
+  { value: 'Patch Confort (+5 ans)', labelAr: 'لاصقة مريحة (+5 سنوات)' },
 ];
 
 export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
   isOpen,
+  language = 'fr',
   profile,
   onClose,
   onConfirmReplace,
 }) => {
+  const isAr = language === 'ar';
   const [deviceId, setDeviceId] = useState('BT-CORE-04');
   const [deviceName, setDeviceName] = useState(profile.deviceName);
   const [patchLabel, setPatchLabel] = useState(profile.patchLabel);
@@ -34,12 +37,14 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setPatchLabel(profile.patchLabel);
-      setDeviceName(profile.deviceName || `Cœur de ${profile.name}`);
+      setDeviceName(
+        profile.deviceName || (isAr ? `وحدة ${profile.name}` : `Cœur de ${profile.name}`)
+      );
       const nextSuggested =
         SUGGESTED_MODULES.find((id) => id !== profile.deviceId) ?? 'BT-CORE-08';
       setDeviceId(nextSuggested);
     }
-  }, [isOpen, profile.deviceId, profile.deviceName, profile.name, profile.patchLabel]);
+  }, [isOpen, profile.deviceId, profile.deviceName, profile.name, profile.patchLabel, isAr]);
 
   if (!isOpen) return null;
 
@@ -47,7 +52,8 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
     e.preventDefault();
     const cleaned = deviceId.trim().toUpperCase();
     if (!cleaned) return;
-    const cleanedName = deviceName.trim() || `Cœur de ${profile.name}`;
+    const cleanedName =
+      deviceName.trim() || (isAr ? `وحدة ${profile.name}` : `Cœur de ${profile.name}`);
     onConfirmReplace(cleaned, cleanedName, patchLabel);
     onClose();
   };
@@ -57,20 +63,20 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="replace-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F2928]/45 dark:bg-[#040914]/70 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1D32]/45 dark:bg-[#030712]/75 backdrop-blur-xs"
     >
-      <div className="bg-white dark:bg-[#0F1E36] border border-[#DCE6E5] dark:border-[#1E3354] rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-xl">
+      <div className="bg-white dark:bg-[#0D1626] border border-[#E1E8EE] dark:border-[#1B2A42] rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2
               id="replace-modal-title"
-              className="text-lg font-bold text-[#0F2928] dark:text-[#F1F6FA]"
+              className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9]"
             >
-              Remplacer ou associer un nouveau module
+              {isAr ? 'استبدال أو ربط وحدة جديدة' : 'Remplacer ou associer un nouveau module'}
             </h2>
-            <p className="mt-1 text-xs text-[#52666A] dark:text-[#8BA3BC]">
-              Profil sélectionné :{' '}
-              <span className="font-semibold text-[#0F2928] dark:text-[#F1F6FA]">
+            <p className="mt-1 text-xs text-[#64798F] dark:text-[#7B91A8]">
+              {isAr ? 'الملف المحدد:' : 'Profil sélectionné :'}{' '}
+              <span className="font-semibold text-[#0F1D32] dark:text-[#F1F5F9]">
                 {profile.name}
               </span>{' '}
               ({profile.ageLabel})
@@ -79,23 +85,33 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer la fenêtre"
-            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#52666A] hover:bg-[#F3F7F7] hover:text-[#0F2928] dark:text-[#8BA3BC] dark:hover:bg-[#162947] dark:hover:text-[#F1F6FA] cursor-pointer"
+            aria-label={isAr ? 'إغلاق النافذة' : 'Fermer la fenêtre'}
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#475B70] hover:bg-[#F4F7F9] hover:text-[#0F1D32] dark:text-[#9DB0C6] dark:hover:bg-[#122038] dark:hover:text-[#F1F5F9] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] dark:bg-[#0D2B2C] dark:border-[#115E59] flex items-start gap-2.5 text-xs text-[#065F46] dark:text-[#5EEAD4]">
+        <div className="p-3.5 rounded-xl bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] flex items-start gap-2.5 text-xs text-[#087066] dark:text-[#5EEAD4]">
           <ShieldCheck
-            className="w-4 h-4 text-[#0F766E] dark:text-[#2DD4BF] shrink-0 mt-0.5"
+            className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0 mt-0.5"
             aria-hidden="true"
           />
           <p className="leading-relaxed">
-            <strong>Continuité garantie :</strong> le profil de {profile.name}, ses{' '}
-            {profile.readings.length} mesures historiques, ses {profile.notes.length} notes
-            médicales et son seuil d&apos;alerte sont conservés et rattachés sans aucune perte au
-            nouveau module.
+            {isAr ? (
+              <>
+                <strong>استمرارية مضمونة :</strong> يتم الاحتفاظ بملف {profile.name}، وجميع
+                القراءات التاريخية ({profile.readings.length})، والملاحظات الطبية (
+                {profile.notes.length}) وعتبة التنبيه دون أي فقدان عند الربط بالوحدة الجديدة.
+              </>
+            ) : (
+              <>
+                <strong>Continuité garantie :</strong> le profil de {profile.name}, ses{' '}
+                {profile.readings.length} mesures historiques, ses {profile.notes.length} notes
+                médicales et son seuil d&apos;alerte sont conservés et rattachés sans aucune perte au
+                nouveau module.
+              </>
+            )}
           </p>
         </div>
 
@@ -103,21 +119,23 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
           <div>
             <label
               htmlFor="new-device-id"
-              className="block text-xs font-semibold text-[#354E52] dark:text-[#B0C4D8] mb-1.5"
+              className="block text-xs font-semibold text-[#475B70] dark:text-[#9DB0C6] mb-1.5"
             >
-              Identifiant du nouveau module BioTemp Core (actuel : {profile.deviceId})
+              {isAr
+                ? `معرّف وحدة BioTemp Core الجديدة (الحالي: ${profile.deviceId})`
+                : `Identifiant du nouveau module BioTemp Core (actuel : ${profile.deviceId})`}
             </label>
             <input
               id="new-device-id"
               type="text"
               value={deviceId}
               onChange={(e) => setDeviceId(e.target.value)}
-              placeholder="Ex. : BT-CORE-04"
-              className="w-full min-h-[44px] px-3.5 py-2 font-mono text-sm font-semibold text-[#0F2928] bg-[#F8FAFA] border border-[#DCE6E5] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]"
+              placeholder="BT-CORE-04"
+              className="w-full min-h-[42px] px-3.5 py-2 font-mono text-sm font-semibold text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E]"
             />
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[#52666A] dark:text-[#8BA3BC]">
-                Détectés à proximité :
+              <span className="text-xs text-[#64798F] dark:text-[#7B91A8]">
+                {isAr ? 'وحدات مرصودة قريباً:' : 'Détectés à proximité :'}
               </span>
               {SUGGESTED_MODULES.map((id) => (
                 <button
@@ -126,8 +144,8 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
                   onClick={() => setDeviceId(id)}
                   className={`px-2.5 py-1 text-xs font-mono font-medium rounded-lg border transition-colors cursor-pointer ${
                     deviceId.toUpperCase() === id
-                      ? 'bg-[#0F766E] text-white border-[#0F766E] dark:bg-[#0D9488] dark:border-[#0D9488]'
-                      : 'bg-[#F3F7F7] text-[#354E52] border-[#DCE6E5] hover:bg-[#E5EFEF] dark:bg-[#162947] dark:text-[#E2ECF5] dark:border-[#243E63] dark:hover:bg-[#1D355B]'
+                      ? 'bg-[#0B8A7E] text-white border-[#0B8A7E]'
+                      : 'bg-[#F8FAFC] text-[#475B70] border-[#E1E8EE] hover:bg-[#EDF3F7] dark:bg-[#09111E] dark:text-[#9DB0C6] dark:border-[#1B2A42] dark:hover:bg-[#122038]'
                   }`}
                 >
                   {id}
@@ -139,36 +157,38 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
           <div>
             <label
               htmlFor="device-custom-name"
-              className="block text-xs font-semibold text-[#354E52] dark:text-[#B0C4D8] mb-1.5"
+              className="block text-xs font-semibold text-[#475B70] dark:text-[#9DB0C6] mb-1.5"
             >
-              Nom du module dans le foyer (pour éviter toute confusion)
+              {isAr
+                ? 'اسم الوحدة في المنزل (لتفادي الخلط)'
+                : 'Nom du module dans le foyer (pour éviter toute confusion)'}
             </label>
             <input
               id="device-custom-name"
               type="text"
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
-              placeholder={`Ex. : Cœur de ${profile.name}`}
-              className="w-full min-h-[44px] px-3.5 py-2 text-sm text-[#0F2928] bg-[#F8FAFA] border border-[#DCE6E5] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]"
+              placeholder={isAr ? `مثال: وحدة ${profile.name}` : `Ex. : Cœur de ${profile.name}`}
+              className="w-full min-h-[42px] px-3.5 py-2 text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E]"
             />
           </div>
 
           <div>
             <label
               htmlFor="patch-select"
-              className="block text-xs font-semibold text-[#354E52] dark:text-[#B0C4D8] mb-1.5"
+              className="block text-xs font-semibold text-[#475B70] dark:text-[#9DB0C6] mb-1.5"
             >
-              Format de patch médical utilisé
+              {isAr ? 'مقاس اللاصقة الطبية المستخدمة' : 'Format de patch médical utilisé'}
             </label>
             <select
               id="patch-select"
               value={patchLabel}
               onChange={(e) => setPatchLabel(e.target.value)}
-              className="w-full min-h-[44px] px-3.5 py-2 text-sm text-[#0F2928] bg-[#F8FAFA] border border-[#DCE6E5] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E]"
+              className="w-full min-h-[42px] px-3.5 py-2 text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E]"
             >
               {PATCH_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
+                <option key={opt.value} value={opt.value}>
+                  {isAr ? opt.labelAr : opt.value}
                 </option>
               ))}
             </select>
@@ -178,17 +198,17 @@ export const ReplaceDeviceModal: React.FC<ReplaceDeviceModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[42px] px-4 py-2 text-sm font-medium text-[#52666A] hover:text-[#0F2928] dark:text-[#8BA3BC] dark:hover:text-[#F1F6FA] rounded-xl cursor-pointer"
+              className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#64798F] hover:text-[#0F1D32] dark:text-[#7B91A8] dark:hover:text-[#F1F5F9] rounded-lg cursor-pointer"
             >
-              Annuler
+              {isAr ? 'إلغاء' : 'Annuler'}
             </button>
             <button
               type="submit"
               disabled={!deviceId.trim()}
-              className="min-h-[42px] inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] disabled:opacity-45 rounded-xl transition-colors cursor-pointer"
+              className="min-h-[40px] inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] disabled:opacity-45 rounded-lg transition-colors cursor-pointer"
             >
               <RefreshCw className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span>Associer à {profile.name}</span>
+              <span>{isAr ? `ربط بـ ${profile.name}` : `Associer à ${profile.name}`}</span>
               <Check className="w-4 h-4 shrink-0" aria-hidden="true" />
             </button>
           </div>

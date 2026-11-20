@@ -52,6 +52,7 @@ export interface AppStrings {
     transferBtn: string;
     vaccinationsTitle: string;
     vaccinationsSubtitle: string;
+    vaccinationCalendarBtn: string;
     remindersTitle: string;
     remindersSubtitle: string;
   };
@@ -201,6 +202,23 @@ export interface AppStrings {
     resumeSessionBtn: string;
     sessionSavedCharge: string;
     signalQualityHeading: string;
+    batteryTrendTitle: string;
+    batteryPerDayUnit: string;
+    batteryForecastLabel: string;
+    batteryForecastNow: string;
+    batteryForecastDays: string;
+    batteryForecastMoreThan30: string;
+    batteryRemainingLabel: string;
+    batteryRemainingHours: string;
+    batteryStandardRateNote: string;
+    patchForecastLabel: string;
+    patchForecastNow: string;
+    patchForecastHours: string;
+    todayLabel: string;
+    hourUnit: string;
+    lowBatteryWarningTitle: string;
+    lowBatteryWarningDesc: string;
+    lowBatteryReplaceAction: string;
   };
   medicalNotes: {
     subtitle: string;
@@ -275,6 +293,7 @@ const FR_STRINGS: AppStrings = {
     transferBtn: 'Transférer 30 min',
     vaccinationsTitle: 'Vaccinations',
     vaccinationsSubtitle: 'Suivi vaccinal',
+    vaccinationCalendarBtn: 'Calendrier vaccinal',
     remindersTitle: 'Rappels médicaux',
     remindersSubtitle: 'Rendez-vous & traitements hors température',
   },
@@ -432,6 +451,24 @@ const FR_STRINGS: AppStrings = {
     sessionSavedCharge:
       "Session enregistrée : Pensez à recharger BioTemp Core afin qu'il soit prêt pour la prochaine utilisation.",
     signalQualityHeading: 'Qualité du signal & de la pose',
+    batteryTrendTitle: 'Tendance batterie · 7 jours',
+    batteryPerDayUnit: '%/j',
+    batteryForecastLabel: 'Prochaine charge',
+    batteryForecastNow: 'Immédiate',
+    batteryForecastDays: 'Dans ~{days} j',
+    batteryForecastMoreThan30: '> 30 jours',
+    batteryRemainingLabel: 'Autonomie estimée',
+    batteryRemainingHours: '~{hours} h',
+    batteryStandardRateNote: 'Base 0,5 %/h',
+    patchForecastLabel: 'Prochain patch',
+    patchForecastNow: 'À changer maintenant',
+    patchForecastHours: 'Dans {hours} h',
+    todayLabel: 'Auj.',
+    hourUnit: 'h',
+    lowBatteryWarningTitle: 'Batterie critique (< 15 %)',
+    lowBatteryWarningDesc:
+      'Autonomie estimée à ~{hours} h. Pensez à recharger BioTemp Core ou à changer de module prochainement.',
+    lowBatteryReplaceAction: 'Changer de module',
   },
   medicalNotes: {
     subtitle: 'Suivi clinique',
@@ -527,6 +564,7 @@ const AR_STRINGS: AppStrings = {
     transferBtn: 'نقل آخر 30 د',
     vaccinationsTitle: 'التطعيمات',
     vaccinationsSubtitle: 'متابعة اللقاحات',
+    vaccinationCalendarBtn: 'الجدول التلقيحي',
     remindersTitle: 'التذكيرات الطبية',
     remindersSubtitle: 'المواعيد والعلاجات غير المرتبطة بالحرارة',
   },
@@ -682,6 +720,24 @@ const AR_STRINGS: AppStrings = {
     sessionSavedCharge:
       'تم حفظ الجلسة : يُفضّل شحن BioTemp Core الآن ليكون جاهزاً عند الحاجة القادمة.',
     signalQualityHeading: 'جودة الإشارة والتثبيت',
+    batteryTrendTitle: 'استهلاك البطارية · 7 أيام',
+    batteryPerDayUnit: '%/يوم',
+    batteryForecastLabel: 'الشحن القادم',
+    batteryForecastNow: 'فوراً',
+    batteryForecastDays: 'خلال ~{days} ي',
+    batteryForecastMoreThan30: '> 30 يوماً',
+    batteryRemainingLabel: 'المدة المتبقية',
+    batteryRemainingHours: '~{hours} س',
+    batteryStandardRateNote: 'معدل 0.5 %/س',
+    patchForecastLabel: 'اللاصقة القادمة',
+    patchForecastNow: 'تغيير الآن',
+    patchForecastHours: 'خلال {hours} س',
+    todayLabel: 'اليوم',
+    hourUnit: 'س',
+    lowBatteryWarningTitle: 'بطارية منخفضة جداً (< 15 %)',
+    lowBatteryWarningDesc:
+      'المدة المتبقية تُقدَّر بنحو ~{hours} ساعة. يُرجى شحن BioTemp Core أو استبدال الوحدة قريباً.',
+    lowBatteryReplaceAction: 'استبدال الوحدة',
   },
   medicalNotes: {
     subtitle: 'المتابعة السريرية',

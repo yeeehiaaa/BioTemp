@@ -45,14 +45,15 @@ interface ThermalChartProps {
 
 const TIME_WINDOWS: TimeWindowHours[] = [1, 6, 12, 24];
 
-function formatDurationLabel(ms: number): string {
+function formatDurationLabel(ms: number, language: AppLanguage): string {
   const totalMinutes = Math.max(1, Math.round(ms / 60000));
   if (totalMinutes < 60) {
-    return `${totalMinutes} min`;
+    return language === 'ar' ? `${totalMinutes} د` : `${totalMinutes} min`;
   }
   const hours = Math.floor(totalMinutes / 60);
   const mins = totalMinutes % 60;
-  return mins > 0 ? `${hours} h ${String(mins).padStart(2, '0')}` : `${hours} h`;
+  const hUnit = language === 'ar' ? 'س' : 'h';
+  return mins > 0 ? `${hours} ${hUnit} ${String(mins).padStart(2, '0')}` : `${hours} ${hUnit}`;
 }
 
 export const ThermalChart: React.FC<ThermalChartProps> = ({
@@ -134,7 +135,6 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
       }
     }
     if (inside.length >= 2) return inside;
-    // Ensure at least 2 nearest readings for zoomed small intervals
     const sortedByDist = windowReadings
       .slice()
       .sort(
@@ -176,7 +176,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
   );
 
   const width = 760;
-  const height = 260;
+  const height = 256;
   const padLeft = 48;
   const padRight = 22;
   const padTop = 24;
@@ -244,11 +244,11 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
       const ts = viewMinTs + ratio * viewSpan;
       arr.push({
         x: padLeft + ratio * plotW,
-        label: formatTimeFr(ts),
+        label: formatTimeFr(ts, language),
       });
     }
     return arr;
-  }, [viewMinTs, viewSpan, points.length, plotW]);
+  }, [viewMinTs, viewSpan, points.length, plotW, language]);
 
   const inspectablePoints = points.filter(
     (p) => p.timestamp >= viewMinTs && p.timestamp <= viewMaxTs
@@ -366,51 +366,48 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
     <section
       id="courbe-notes"
       aria-label="Courbe thermique interactive"
-      className="biotemp-card p-5 sm:p-6 flex flex-col gap-4 min-w-0 overflow-hidden transition-colors duration-300"
+      className="biotemp-card p-5 sm:p-6 flex flex-col justify-between gap-4 min-w-0 overflow-hidden transition-colors duration-200"
     >
+      {/* Header + Segmented Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC]">
+          <p className="text-xs font-medium text-[#64798F] dark:text-[#8DA2B9]">
             {t.eyebrow}
+            {isZoomed && (
+              <span className="ms-2 font-mono font-semibold text-[#0B8A7E] dark:text-[#2DD4BF]">
+                · {language === 'ar' ? 'تكبير' : 'Zoom'}{' '}
+                {zoomLevel.toFixed(1).replace('.', language === 'ar' ? '.' : ',')}× (
+                {formatDurationLabel(viewSpan, language)})
+              </span>
+            )}
           </p>
-          <h2 className="text-lg font-bold text-[#162642] dark:text-[#F1F6FA] flex items-center gap-2">
-            <Activity className="w-5 h-5 text-[#0D9488] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
+          <h2 className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-2 mt-0.5">
+            <Activity className="w-5 h-5 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
             <span>
               {t.title} — {profileName}
             </span>
           </h2>
-          <p className="mt-0.5 text-xs text-[#647B8C] dark:text-[#8BA3BC] tabular-nums transition-opacity duration-300">
-            {t.min} {formatTempFr(stats.min, tempUnit, language)} {unitSuffix} · {t.avg}{' '}
-            {formatTempFr(stats.avg, tempUnit, language)} {unitSuffix} · {t.max}{' '}
-            {formatTempFr(stats.max, tempUnit, language)} {unitSuffix} · {t.thresholdLabel}{' '}
-            {formatTempFr(threshold, tempUnit, language)} {unitSuffix}
-            {isZoomed && (
-              <span className="ml-1.5 font-semibold text-[#0D9488] dark:text-[#2DD4BF]">
-                · Zoom {zoomLevel.toFixed(1).replace('.', ',')}× ({formatDurationLabel(viewSpan)})
-              </span>
-            )}
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* Tactile Zoom Controls */}
+          {/* Zoom Controls */}
           <div
             role="group"
-            aria-label="Contrôles de zoom"
-            className="inline-flex items-center gap-0.5 p-1 bg-[#F3F7F9] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-full"
+            aria-label={language === 'ar' ? 'أدوات التكبير' : 'Contrôles de zoom'}
+            className="inline-flex items-center gap-0.5 p-0.5 bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
           >
             <button
               type="button"
               onClick={() => handleAdjustZoom(0.7)}
               disabled={!isZoomed}
-              aria-label="Dézoomer la courbe"
-              title="Dézoomer"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-[#162642] dark:text-[#F1F6FA] hover:bg-white dark:hover:bg-[#162947] disabled:opacity-35 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              aria-label={language === 'ar' ? 'تصغير المنحنى' : 'Dézoomer la courbe'}
+              title={language === 'ar' ? 'تصغير' : 'Dézoomer'}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-[#0F1D32] dark:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#132036] disabled:opacity-35 transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
               <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
-            <span className="px-1.5 font-mono text-[11px] font-bold text-[#0F766E] dark:text-[#5EEAD4] tabular-nums min-w-[38px] text-center">
-              {zoomLevel.toFixed(1).replace('.', ',')}×
+            <span className="px-1.5 font-mono text-[11px] font-bold text-[#0B8A7E] dark:text-[#5EEAD4] tabular-nums min-w-[36px] text-center">
+              {zoomLevel.toFixed(1).replace('.', language === 'ar' ? '.' : ',')}×
             </span>
             <button
               type="button"
@@ -418,7 +415,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
               disabled={zoomLevel >= 8}
               aria-label="Zoomer sur une courte période"
               title="Zoomer"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-[#162642] dark:text-[#F1F6FA] hover:bg-white dark:hover:bg-[#162947] disabled:opacity-35 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-[#0F1D32] dark:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#132036] disabled:opacity-35 transition-colors cursor-pointer disabled:cursor-not-allowed"
             >
               <ZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -428,37 +425,37 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                 onClick={handleResetZoom}
                 aria-label="Réinitialiser le zoom"
                 title="Réinitialiser la vue"
-                className="w-8 h-8 flex items-center justify-center rounded-full text-[#647B8C] hover:text-[#162642] hover:bg-white dark:text-[#8BA3BC] dark:hover:text-[#F1F6FA] dark:hover:bg-[#162947] transition-colors cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center rounded-md text-[#64798F] hover:text-[#0F1D32] hover:bg-white dark:text-[#8DA2B9] dark:hover:text-[#F1F5F9] dark:hover:bg-[#132036] transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             )}
           </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setCursorModeActive((prev) => {
-                  if (prev) setHoveredId(null);
-                  return !prev;
-                });
-              }}
-              aria-pressed={cursorModeActive}
-              className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
-                cursorModeActive
-                  ? 'bg-[#162642] text-white border-[#162642] dark:bg-[#0D9488] dark:border-[#0D9488]'
-                  : 'bg-[#F3F7F9] text-[#476074] border-[#E6EFF2] hover:text-[#162642] dark:bg-[#0B172B] dark:text-[#94ACC4] dark:border-[#1E3354]'
-              }`}
-            >
-              <Crosshair className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>{t.cursor}</span>
-            </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCursorModeActive((prev) => {
+                if (prev) setHoveredId(null);
+                return !prev;
+              });
+            }}
+            aria-pressed={cursorModeActive}
+            className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
+              cursorModeActive
+                ? 'bg-[#0F1D32] text-white border-[#0F1D32] dark:bg-[#0B8A7E] dark:border-[#0B8A7E]'
+                : 'bg-[#F8FAFC] text-[#475B70] border-[#E1E8EE] hover:text-[#0F1D32] dark:bg-[#09111E] dark:text-[#9DB0C6] dark:border-[#1B2A42]'
+            }`}
+          >
+            <Crosshair className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{t.cursor}</span>
+          </button>
 
-            {/* Time Window Selector */}
+          {/* Time Window Selector */}
           <div
             role="group"
             aria-label="Période d'affichage"
-            className="inline-flex items-center gap-1 p-1 bg-[#F3F7F9] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-full"
+            className="inline-flex items-center gap-0.5 p-0.5 bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
           >
             {TIME_WINDOWS.map((h) => {
               const active = timeWindow === h;
@@ -467,13 +464,13 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                   key={h}
                   type="button"
                   onClick={() => onChangeTimeWindow(h)}
-                  className={`min-h-[34px] px-3 py-1 text-xs font-semibold rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                  className={`min-h-[32px] px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
                     active
-                      ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                      : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                      ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                      : 'text-[#64798F] dark:text-[#8DA2B9] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
                   }`}
                 >
-                  {h} h
+                  {language === 'ar' ? `${h} س` : `${h} h`}
                 </button>
               );
             })}
@@ -481,19 +478,58 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
         </div>
       </div>
 
+      {/* 4-Column Telemetry Metric Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-2 sm:gap-y-0 sm:divide-x divide-[#E1E8EE] dark:divide-[#1B2A42] bg-[#F8FAFC] dark:bg-[#09111E] border border-[#E1E8EE] dark:border-[#1B2A42] rounded-xl py-2.5">
+        <div className="px-3 text-center sm:text-start">
+          <p className="text-[11px] font-medium text-[#64798F] dark:text-[#8DA2B9]">{t.min}</p>
+          <p className="font-mono text-sm font-bold text-[#0B8A7E] dark:text-[#5EEAD4] tabular-nums">
+            {formatTempFr(stats.min, tempUnit, language)} {unitSuffix}
+          </p>
+        </div>
+        <div className="px-3 text-center sm:text-start">
+          <p className="text-[11px] font-medium text-[#64798F] dark:text-[#8DA2B9]">{t.avg}</p>
+          <p className="font-mono text-sm font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
+            {formatTempFr(stats.avg, tempUnit, language)} {unitSuffix}
+          </p>
+        </div>
+        <div className="px-3 text-center sm:text-start">
+          <p className="text-[11px] font-medium text-[#64798F] dark:text-[#8DA2B9]">{t.max}</p>
+          <p className="font-mono text-sm font-bold text-[#D91E43] dark:text-[#FDA4AF] tabular-nums">
+            {formatTempFr(stats.max, tempUnit, language)} {unitSuffix}
+          </p>
+        </div>
+        <div className="px-3 text-center sm:text-start">
+          <p className="text-[11px] font-medium text-[#64798F] dark:text-[#8DA2B9] truncate">
+            {t.thresholdLabel} ·{' '}
+            <span
+              className={`font-mono font-semibold ${
+                stats.aboveThresholdCount > 0
+                  ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                  : 'text-[#087066] dark:text-[#5EEAD4]'
+              }`}
+            >
+              {stats.aboveThresholdCount} {t.alerts.toLowerCase()}
+            </span>
+          </p>
+          <p className="font-mono text-sm font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
+            {formatTempFr(threshold, tempUnit, language)} {unitSuffix}
+          </p>
+        </div>
+      </div>
+
       {/* Interactive readout strip */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] text-xs transition-colors duration-300">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] text-xs transition-colors">
         {activePoint ? (
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[#476074] dark:text-[#B0C4D8] tabular-nums">
-            <span className="font-bold text-[#162642] dark:text-[#F1F6FA] inline-flex items-center gap-1.5">
-              <Crosshair className="w-3.5 h-3.5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[#475B70] dark:text-[#9DB0C6] tabular-nums">
+            <span className="font-semibold text-[#0F1D32] dark:text-[#F1F5F9] inline-flex items-center gap-1.5">
+              <Crosshair className="w-3.5 h-3.5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
               {hoveredId || cursorModeActive
                 ? `${t.cursor} :`
                 : language === 'ar'
                 ? 'آخر قياس :'
                 : 'Dernier relevé :'}
             </span>
-            <span className="font-mono font-bold text-[#0D9488] dark:text-[#2DD4BF] transition-colors duration-300">
+            <span className="font-mono font-bold text-[#0B8A7E] dark:text-[#2DD4BF]">
               {formatTempFr(
                 activePoint.isLast && !hoveredId && !cursorModeActive
                   ? animatedLatestValue
@@ -507,8 +543,8 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
               <span
                 className={`font-mono text-[11px] font-semibold ${
                   stepDelta > 0
-                    ? 'text-[#EA580C] dark:text-[#FDBA74]'
-                    : 'text-[#0F766E] dark:text-[#5EEAD4]'
+                    ? 'text-[#C26B08] dark:text-[#FCD34D]'
+                    : 'text-[#0B8A7E] dark:text-[#5EEAD4]'
                 }`}
               >
                 ({stepDelta > 0 ? '+' : ''}
@@ -526,42 +562,42 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                   setHoveredId(null);
                   setCursorModeActive(false);
                 }}
-                className="ml-1 px-2 py-0.5 rounded-full bg-[#E6F7F5] text-[#0F766E] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] text-[11px] font-semibold cursor-pointer"
+                className="ms-1 px-2 py-0.5 rounded-md bg-[#EDF9F7] text-[#087066] dark:bg-[#0A2624] dark:text-[#5EEAD4] text-[11px] font-semibold cursor-pointer"
               >
                 {t.live}
               </button>
             )}
           </div>
         ) : (
-          <span className="text-[#647B8C] dark:text-[#8BA3BC]">
+          <span className="text-[#64798F] dark:text-[#8DA2B9]">
             {language === 'ar' ? 'لا توجد قياسات في هذه الفترة' : 'Aucune mesure sur cette plage'}
           </span>
         )}
 
-        <div className="flex flex-wrap items-center gap-4 text-[#647B8C] dark:text-[#8BA3BC]">
+        <div className="flex flex-wrap items-center gap-3.5 text-[11px] text-[#64798F] dark:text-[#8DA2B9]">
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3 h-0.5 bg-[#0D9488] dark:bg-[#2DD4BF] inline-block" aria-hidden="true" />
+            <span className="w-3 h-0.5 bg-[#0B8A7E] dark:bg-[#2DD4BF] inline-block" aria-hidden="true" />
             {t.live}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB] dark:bg-[#60A5FA] inline-block" aria-hidden="true" />
+            <span className="w-2 h-2 rounded-full bg-[#2563EB] dark:bg-[#60A5FA] inline-block" aria-hidden="true" />
             {language === 'ar' ? 'مزامنة الذاكرة' : 'Sync tampon'}
           </span>
           {filteredNotes.some((n) => typeof n.referenceTemp === 'number') && (
             <span className="inline-flex items-center gap-1.5 text-[#4338CA] dark:text-[#A5B4FC] font-medium">
-              <span className="w-2.5 h-2.5 rotate-45 bg-[#4F46E5] dark:bg-[#818CF8] inline-block" aria-hidden="true" />
-              {language === 'ar' ? 'قياس مرجعي' : 'Réf. thermomètre'}
+              <span className="w-2 h-2 rotate-45 bg-[#4F46E5] dark:bg-[#818CF8] inline-block" aria-hidden="true" />
+              {language === 'ar' ? 'قياس مرجعي' : 'Réf.'}
             </span>
           )}
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3 h-0.5 border-t-2 border-dashed border-[#E11D48] dark:border-[#FB7185] inline-block" aria-hidden="true" />
-            {t.thresholdLabel} ({formatTempFr(threshold, tempUnit, language)} {unitSuffix})
+            <span className="w-3 h-0.5 border-t-2 border-dashed border-[#D91E43] dark:border-[#FB7185] inline-block" aria-hidden="true" />
+            {t.thresholdLabel}
           </span>
         </div>
       </div>
 
-      {/* Main SVG Plot (supports pinch-to-zoom & touch/pointer cursor scrubbing) */}
-      <div className="w-full relative">
+      {/* Main SVG Plot (forced LTR so chronological X-axis & coordinates stay consistent in AR RTL) */}
+      <div dir="ltr" className="w-full relative">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${width} ${height}`}
@@ -586,8 +622,8 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
         >
           <defs>
             <linearGradient id="biotempAreaClean" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#14B8A6" stopOpacity="0.24" />
-              <stop offset="100%" stopColor="#14B8A6" stopOpacity="0.01" />
+              <stop offset="0%" stopColor="#0B8A7E" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#0B8A7E" stopOpacity="0.01" />
             </linearGradient>
             <clipPath id={clipId}>
               <rect x={padLeft} y={padTop - 8} width={plotW} height={plotH + 16} />
@@ -605,30 +641,30 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                   ? { duration: 0 }
                   : { type: 'spring', stiffness: 160, damping: 26 }
               }
-              className="fill-[#FFF1F2] dark:fill-[#4C0519]/35"
+              className="fill-[#FEF1F3] dark:fill-[#4C0519]/30"
               opacity="0.7"
             />
           )}
 
-          {yTicks.map((t) => {
-            const y = yForTemp(t);
+          {yTicks.map((tickVal) => {
+            const y = yForTemp(tickVal);
             return (
-              <g key={t}>
+              <g key={tickVal}>
                 <line
                   x1={padLeft}
                   y1={y}
                   x2={width - padRight}
                   y2={y}
-                  className="stroke-[#E8F0F2] dark:stroke-[#1E3354]"
+                  className="stroke-[#E8EFF4] dark:stroke-[#1B2A42]"
                   strokeWidth="1"
                 />
                 <text
                   x={padLeft - 8}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-[#7B8FA1] dark:fill-[#8BA3BC] text-[11px] font-mono"
+                  className="fill-[#64798F] dark:fill-[#7B91A8] text-[11px] font-mono"
                 >
-                  {formatTempFr(t, tempUnit, language)}
+                  {formatTempFr(tickVal, tempUnit, language)}
                 </text>
               </g>
             );
@@ -640,7 +676,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
               x={tick.x}
               y={height - 10}
               textAnchor="middle"
-              className="fill-[#7B8FA1] dark:fill-[#8BA3BC] text-[11px] font-mono"
+              className="fill-[#64798F] dark:fill-[#7B91A8] text-[11px] font-mono"
             >
               {tick.label}
             </text>
@@ -655,7 +691,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                 ? { duration: 0 }
                 : { type: 'spring', stiffness: 160, damping: 26 }
             }
-            className="stroke-[#E11D48] dark:stroke-[#FB7185]"
+            className="stroke-[#D91E43] dark:stroke-[#FB7185]"
             strokeWidth="1.5"
             strokeDasharray="6 4"
           />
@@ -668,12 +704,11 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                 : { type: 'spring', stiffness: 160, damping: 26 }
             }
             textAnchor="end"
-            className="fill-[#E11D48] dark:fill-[#FDA4AF] text-[11px] font-semibold"
+            className="fill-[#D91E43] dark:fill-[#FDA4AF] text-[11px] font-semibold"
           >
             {t.thresholdLabel} {formatTempFr(threshold, tempUnit, language)} {unitSuffix}
           </motion.text>
 
-          {/* Clipped Curve, Points, Crosshair & Notes */}
           <g clipPath={`url(#${clipId})`}>
             {areaPath && (
               <motion.path
@@ -682,7 +717,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                 fill="url(#biotempAreaClean)"
                 initial={shouldReduceMotion ? false : { opacity: 0.45 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.45, ease: 'easeOut' }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
               />
             )}
             {linePath && (
@@ -690,13 +725,13 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                 key={`line-${profileName}-${timeWindow}`}
                 d={linePath}
                 fill="none"
-                className="stroke-[#0D9488] dark:stroke-[#2DD4BF]"
-                strokeWidth="2.8"
+                className="stroke-[#0B8A7E] dark:stroke-[#2DD4BF]"
+                strokeWidth="2.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 initial={shouldReduceMotion ? false : { pathLength: 0.88, opacity: 0.55 }}
                 animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               />
             )}
 
@@ -711,8 +746,8 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                   }
                   y1={padTop}
                   y2={padTop + plotH}
-                  className="stroke-[#162642] dark:stroke-[#5EEAD4]"
-                  strokeWidth="1.3"
+                  className="stroke-[#0F1D32] dark:stroke-[#5EEAD4]"
+                  strokeWidth="1.2"
                   strokeDasharray="3 3"
                 />
                 <motion.circle
@@ -724,7 +759,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                   }
                   r="10"
                   fill="none"
-                  className="stroke-[#0D9488] dark:stroke-[#2DD4BF]"
+                  className="stroke-[#0B8A7E] dark:stroke-[#2DD4BF]"
                   strokeWidth="1.8"
                   strokeOpacity="0.65"
                 />
@@ -735,8 +770,8 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
               const isHovered = pt.id === activePoint?.id && (Boolean(hoveredId) || cursorModeActive);
               const isAbove = pt.value >= threshold;
               const isSynced = pt.source === 'buffered_sync';
-              const fill = isAbove ? '#F43F5E' : isSynced ? '#3B82F6' : '#14B8A6';
-              const radius = isHovered ? 6.5 : pt.isLast || isSynced || isAbove ? 4.5 : 3.5;
+              const fill = isAbove ? '#D91E43' : isSynced ? '#2563EB' : '#0B8A7E';
+              const rSize = isHovered ? 6.5 : pt.isLast || isSynced || isAbove ? 4.5 : 3.5;
 
               return (
                 <g key={pt.id}>
@@ -756,16 +791,16 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                     initial={
                       shouldReduceMotion ? false : { r: 0, opacity: 0, cx: pt.x, cy: pt.y }
                     }
-                    animate={{ cx: pt.x, cy: pt.y, r: radius, opacity: 1 }}
+                    animate={{ cx: pt.x, cy: pt.y, r: rSize, opacity: 1 }}
                     transition={
                       shouldReduceMotion
                         ? { duration: 0 }
-                        : { duration: 0.35, ease: [0.22, 1, 0.36, 1] }
+                        : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
                     }
                     fill={fill}
-                    className="stroke-white dark:stroke-[#0F1E36]"
+                    className="stroke-white dark:stroke-[#0D1626]"
                     strokeWidth="1.8"
-                    style={{ transition: 'fill 350ms ease' }}
+                    style={{ transition: 'fill 300ms ease' }}
                   />
                   <circle
                     cx={pt.x}
@@ -795,7 +830,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                   key={note.id}
                   initial={shouldReduceMotion ? false : { opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
                   className="cursor-pointer"
                   onClick={() => setSelectedNoteId(isSelected ? null : note.id)}
                 >
@@ -807,7 +842,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                     className={
                       hasRef
                         ? 'stroke-[#4F46E5] dark:stroke-[#818CF8]'
-                        : 'stroke-[#162642] dark:stroke-[#5EEAD4]'
+                        : 'stroke-[#0F1D32] dark:stroke-[#5EEAD4]'
                     }
                     strokeWidth={hasRef ? '1.3' : '1'}
                     strokeDasharray={hasRef ? '3 2' : undefined}
@@ -830,7 +865,7 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                         width={10}
                         height={10}
                         transform={`rotate(45 ${nx} ${refY})`}
-                        className="fill-[#4F46E5] dark:fill-[#818CF8] stroke-white dark:stroke-[#0F1E36]"
+                        className="fill-[#4F46E5] dark:fill-[#818CF8] stroke-white dark:stroke-[#0D1626]"
                         strokeWidth="1.6"
                       />
                     </g>
@@ -843,10 +878,10 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                       isSelected
                         ? hasRef
                           ? 'fill-[#4338CA] dark:fill-[#818CF8]'
-                          : 'fill-[#162642] dark:fill-[#2DD4BF]'
-                        : 'fill-white dark:fill-[#132544]'
+                          : 'fill-[#0F1D32] dark:fill-[#2DD4BF]'
+                        : 'fill-white dark:fill-[#132036]'
                     }`}
-                    stroke={hasRef ? '#4F46E5' : '#14B8A6'}
+                    stroke={hasRef ? '#4F46E5' : '#0B8A7E'}
                     strokeWidth="1.6"
                   />
                   <text
@@ -855,10 +890,10 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                     textAnchor="middle"
                     className={`text-[9.5px] font-bold transition-colors duration-200 ${
                       isSelected
-                        ? 'fill-white dark:fill-[#081120]'
+                        ? 'fill-white dark:fill-[#070D19]'
                         : hasRef
                         ? 'fill-[#4338CA] dark:fill-[#A5B4FC]'
-                        : 'fill-[#0D9488] dark:fill-[#5EEAD4]'
+                        : 'fill-[#0B8A7E] dark:fill-[#5EEAD4]'
                     }`}
                   >
                     {hasRef ? 'R' : 'N'}
@@ -870,15 +905,15 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
         </svg>
       </div>
 
-      {/* Tactile Time Scrubber & Zoomed Pan Navigator (visible when inspecting or zoomed) */}
+      {/* Tactile Time Scrubber & Zoomed Pan Navigator */}
       {(cursorModeActive || isZoomed) && (
-        <div className="p-3 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-2.5">
+        <div className="p-3 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
             <label
               htmlFor={`scrubber-${profileName}`}
-              className="text-[11px] font-semibold text-[#476074] dark:text-[#94ACC4] whitespace-nowrap flex items-center gap-1.5"
+              className="text-[11px] font-semibold text-[#475B70] dark:text-[#9DB0C6] whitespace-nowrap flex items-center gap-1.5"
             >
-              <Crosshair className="w-3.5 h-3.5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+              <Crosshair className="w-3.5 h-3.5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
               <span>{t.cursor}</span>
             </label>
 
@@ -898,10 +933,10 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
                 }
               }}
               aria-label="Déplacer le curseur temporel sur les relevés"
-              className="flex-1 accent-[#0D9488] h-2 rounded-lg cursor-pointer"
+              className="flex-1 accent-[#0B8A7E] h-2 rounded-lg cursor-pointer"
             />
 
-            <span className="font-mono text-[11px] font-semibold text-[#162642] dark:text-[#E2ECF5] tabular-nums whitespace-nowrap">
+            <span className="font-mono text-[11px] font-semibold text-[#0F1D32] dark:text-[#E2ECF5] tabular-nums whitespace-nowrap">
               {activePoint
                 ? `${formatTimeFr(activePoint.timestamp, language)} · ${formatTempFr(
                     activePoint.value,
@@ -913,38 +948,46 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
           </div>
 
           {isZoomed && (
-            <div className="pt-2 border-t border-[#E6EFF2] dark:border-[#1E3354] flex items-center gap-2">
-              <span className="text-[11px] font-medium text-[#647B8C] dark:text-[#8BA3BC] whitespace-nowrap">
+            <div className="pt-2 border-t border-[#E1E8EE] dark:border-[#1B2A42] flex items-center gap-2">
+              <span className="text-[11px] font-medium text-[#64798F] dark:text-[#8DA2B9] whitespace-nowrap">
                 {t.panWindow}
               </span>
-              <button
-                type="button"
-                onClick={() => setPanRatio((r) => Math.max(0, Number((r - 0.15).toFixed(2))))}
-                disabled={panRatio <= 0}
-                aria-label="Reculer dans la période"
-                className="w-7 h-7 rounded-full bg-white dark:bg-[#162947] border border-[#DCE6EA] dark:border-[#243E63] flex items-center justify-center text-[#162642] dark:text-[#F1F6FA] disabled:opacity-35 cursor-pointer"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={panRatio}
-                onChange={(e) => setPanRatio(Number(e.target.value))}
-                aria-label="Position horizontale du zoom dans la plage horaire"
-                className="flex-1 accent-[#162642] dark:accent-[#2DD4BF] h-1.5 rounded-lg cursor-pointer"
-              />
-              <button
-                type="button"
-                onClick={() => setPanRatio((r) => Math.min(1, Number((r + 0.15).toFixed(2))))}
-                disabled={panRatio >= 1}
-                aria-label="Avancer vers les relevés récents"
-                className="w-7 h-7 rounded-full bg-white dark:bg-[#162947] border border-[#DCE6EA] dark:border-[#243E63] flex items-center justify-center text-[#162642] dark:text-[#F1F6FA] disabled:opacity-35 cursor-pointer"
-              >
-                <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
+              <div dir="ltr" className="flex-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPanRatio((r) => Math.max(0, Number((r - 0.15).toFixed(2))))}
+                  disabled={panRatio <= 0}
+                  aria-label={language === 'ar' ? 'الرجوع في الفترة' : 'Reculer dans la période'}
+                  className="w-7 h-7 rounded-lg bg-white dark:bg-[#132036] border border-[#E1E8EE] dark:border-[#1E304D] flex items-center justify-center text-[#0F1D32] dark:text-[#F1F5F9] disabled:opacity-35 cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={panRatio}
+                  onChange={(e) => setPanRatio(Number(e.target.value))}
+                  aria-label={
+                    language === 'ar'
+                      ? 'الموضع الأفقي للنافذة الزمنية'
+                      : 'Position horizontale du zoom dans la plage horaire'
+                  }
+                  className="flex-1 accent-[#0F1D32] dark:accent-[#2DD4BF] h-1.5 rounded-lg cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPanRatio((r) => Math.min(1, Number((r + 0.15).toFixed(2))))}
+                  disabled={panRatio >= 1}
+                  aria-label={
+                    language === 'ar' ? 'التقدم نحو القياسات الأحدث' : 'Avancer vers les relevés récents'
+                  }
+                  className="w-7 h-7 rounded-lg bg-white dark:bg-[#132036] border border-[#E1E8EE] dark:border-[#1E304D] flex items-center justify-center text-[#0F1D32] dark:text-[#F1F5F9] disabled:opacity-35 cursor-pointer"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -956,31 +999,31 @@ export const ThermalChart: React.FC<ThermalChartProps> = ({
             initial={shouldReduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.22 }}
-            className="p-3 rounded-2xl bg-[#F3F7F9] border border-[#E2ECF0] dark:bg-[#0B172B] dark:border-[#1E3354] flex items-start justify-between gap-3 text-xs"
+            transition={{ duration: 0.2 }}
+            className="p-3 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] flex items-start justify-between gap-3 text-xs"
           >
             <div className="flex items-start gap-2.5">
-              <MessageSquare className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF] shrink-0 mt-0.5" aria-hidden="true" />
+              <MessageSquare className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0 mt-0.5" aria-hidden="true" />
               <div>
-                <p className="font-bold text-[#162642] dark:text-[#F1F6FA]">
+                <p className="font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
                   {activeNote.category} · {formatTimeFr(activeNote.timestamp, language)} ·{' '}
                   <span className="font-mono">
                     {formatTempFr(activeNote.temperatureAtTime, tempUnit, language)} {unitSuffix}
                   </span>
                   {typeof activeNote.referenceTemp === 'number' && (
-                    <span className="ml-2 font-mono text-[#4338CA] dark:text-[#A5B4FC]">
+                    <span className="ms-2 font-mono text-[#4338CA] dark:text-[#A5B4FC]">
                       ({language === 'ar' ? 'المرجعي:' : 'Réf.'}{' '}
                       {formatTempFr(activeNote.referenceTemp, tempUnit, language)} {unitSuffix})
                     </span>
                   )}
                 </p>
-                <p className="mt-0.5 text-[#476074] dark:text-[#94ACC4]">{activeNote.text}</p>
+                <p className="mt-0.5 text-[#475B70] dark:text-[#9DB0C6]">{activeNote.text}</p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setSelectedNoteId(null)}
-              className="text-[#647B8C] hover:text-[#162642] dark:text-[#8BA3BC] dark:hover:text-[#F1F6FA] font-semibold px-2 py-0.5 cursor-pointer"
+              className="text-[#64798F] hover:text-[#0F1D32] dark:text-[#8DA2B9] dark:hover:text-[#F1F5F9] font-semibold px-2 py-0.5 cursor-pointer"
             >
               {language === 'ar' ? 'إغلاق' : 'Fermer'}
             </button>

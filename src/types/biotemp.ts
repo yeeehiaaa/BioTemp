@@ -82,11 +82,13 @@ export interface ChildProfile {
   initials: string;
   ageLabel: string;
   ageCategory: AgeCategory;
+  birthDate?: string;
   patchLabel: string;
   patchAppliedAt: number;
   deviceId: string;
   deviceName: string;
   battery: number;
+  batteryHistory?: number[];
   threshold: number;
   connectionMode: ConnectionMode;
   homeHubEnabled: boolean;

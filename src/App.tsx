@@ -133,10 +133,10 @@ function nextPhysiologicalTemp(current: number): number {
 }
 
 const HISTORY_DAYS = [
-  { id: 'd-3', dayLabel: 'Lun', dateNum: '16', window: 24 as TimeWindowHours },
-  { id: 'd-2', dayLabel: 'Mar', dateNum: '17', window: 24 as TimeWindowHours },
-  { id: 'd-1', dayLabel: 'Mer', dateNum: '18', window: 12 as TimeWindowHours },
-  { id: 'today', dayLabel: 'Jeu', dateNum: '19', window: 6 as TimeWindowHours },
+  { id: 'd-3', dayLabelFr: 'Lun', dayLabelAr: 'الإثنين', dateNum: '16', window: 24 as TimeWindowHours },
+  { id: 'd-2', dayLabelFr: 'Mar', dayLabelAr: 'الثلاثاء', dateNum: '17', window: 24 as TimeWindowHours },
+  { id: 'd-1', dayLabelFr: 'Mer', dayLabelAr: 'الأربعاء', dateNum: '18', window: 12 as TimeWindowHours },
+  { id: 'today', dayLabelFr: 'Jeu', dayLabelAr: 'الخميس', dateNum: '19', window: 6 as TimeWindowHours },
 ];
 
 export default function App() {
@@ -905,6 +905,7 @@ export default function App() {
         deviceName: newDeviceName,
         patchLabel: newPatchLabel,
         battery: 96,
+        batteryHistory: [70, 58, 46, 34, 22, 100, 96],
         lastConnectedAt: Date.now(),
         notes: [
           ...p.notes,
@@ -912,7 +913,10 @@ export default function App() {
             id: `${p.id}-swap-${Date.now()}`,
             timestamp: Date.now(),
             category: 'Changement de module',
-            text: `Module remplacé : ${oldId} → ${newDeviceName} (${newDeviceId}, ${newPatchLabel}). Historique complet conservé.`,
+            text:
+              language === 'ar'
+                ? `تم استبدال الوحدة: ${oldId} ← ${newDeviceName} (${newDeviceId}، ${newPatchLabel}). تم الحفاظ على كامل السجل.`
+                : `Module remplacé : ${oldId} → ${newDeviceName} (${newDeviceId}, ${newPatchLabel}). Historique complet conservé.`,
             temperatureAtTime: latest ? latest.value : 37.0,
           },
         ],
@@ -925,7 +929,10 @@ export default function App() {
     updateActiveProfile((p) => ({
       ...p,
       patchAppliedAt: Date.now(),
-      lastSyncNotice: `Nouveau patch posé pour ${p.name} (rappel de changement dans 12–24 h).`,
+      lastSyncNotice:
+        language === 'ar'
+          ? `تم وضع لاصقة جديدة لـ ${p.name} (تذكير بالتغيير خلال 12–24 ساعة).`
+          : `Nouveau patch posé pour ${p.name} (rappel de changement dans 12–24 h).`,
     }));
   };
 
@@ -959,6 +966,7 @@ export default function App() {
   const handleCreateProfile = (payload: {
     name: string;
     ageCategory: AgeCategory;
+    birthDate?: string;
     deviceId: string;
     deviceName: string;
     threshold: number;
@@ -966,11 +974,19 @@ export default function App() {
     const id = `${payload.name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now()}`;
     const ageLabel =
       payload.ageCategory === 'newborn'
-        ? 'Nouveau-né (< 3 mois)'
+        ? language === 'ar'
+          ? 'حديث الولادة (< 3 أشهر)'
+          : 'Nouveau-né (< 3 mois)'
         : payload.ageCategory === 'infant'
-        ? 'Nourrisson 3–24 mois'
+        ? language === 'ar'
+          ? 'رضيع 3–24 شهراً'
+          : 'Nourrisson 3–24 mois'
         : payload.ageCategory === 'child'
-        ? 'Enfant 2–5 ans'
+        ? language === 'ar'
+          ? 'طفل 2–5 سنوات'
+          : 'Enfant 2–5 ans'
+        : language === 'ar'
+        ? 'بالغ +5 سنوات'
         : 'Adulte +5 ans';
     const patchLabel =
       payload.ageCategory === 'newborn' || payload.ageCategory === 'infant'
@@ -986,11 +1002,13 @@ export default function App() {
       initials: payload.name.slice(0, 2).toUpperCase(),
       ageLabel,
       ageCategory: payload.ageCategory,
+      ...(payload.birthDate ? { birthDate: payload.birthDate } : {}),
       patchLabel,
       patchAppliedAt: now,
       deviceId: payload.deviceId,
       deviceName: payload.deviceName,
       battery: 100,
+      batteryHistory: [100, 100, 100, 100, 100, 100, 100],
       threshold: payload.threshold,
       connectionMode: 'ble_connected',
       homeHubEnabled: false,
@@ -1025,6 +1043,12 @@ export default function App() {
   const handleUpdateSleepSchedule = (profileId: string, schedule: SleepSchedule) => {
     setProfiles((prev) =>
       prev.map((p) => (p.id === profileId ? { ...p, sleepSchedule: schedule } : p))
+    );
+  };
+
+  const handleUpdateBirthDate = (profileId: string, birthDate: string) => {
+    setProfiles((prev) =>
+      prev.map((p) => (p.id === profileId ? { ...p, birthDate } : p))
     );
   };
 
@@ -1138,6 +1162,8 @@ export default function App() {
     const noop = () => {};
     const list = buildContextualProTips({
       profile: activeProfile,
+      language,
+      tempUnit,
       identityConfirmed: Boolean(identityConfirmedIds[activeProfile.id]),
       soundEnabled,
       alertsEnabled,
@@ -1162,6 +1188,8 @@ export default function App() {
     };
   }, [
     activeProfile,
+    language,
+    tempUnit,
     identityConfirmedIds,
     soundEnabled,
     alertsEnabled,
@@ -1171,7 +1199,7 @@ export default function App() {
   const strings = getStrings(language);
 
   return (
-    <div className="h-dvh w-full overflow-hidden flex flex-col bg-gradient-to-br from-[#ECF4F6] via-[#F5F9FA] to-[#EDF4F4] dark:from-[#07101F] dark:via-[#0A1628] dark:to-[#081322] text-[#162642] dark:text-[#F1F6FA] transition-colors print:h-auto print:overflow-visible">
+    <div className="h-dvh w-full overflow-hidden flex flex-col bg-[#F4F7F9] dark:bg-[#070D19] text-[#0F1D32] dark:text-[#F1F5F9] transition-colors print:h-auto print:overflow-visible">
       <TopBar
         language={language}
         activePage={activePage}
@@ -1193,25 +1221,24 @@ export default function App() {
         onToggleSimulateNightTime={() => setSimulateNightTime((v) => !v)}
         onSelectPage={handleSelectPage}
         onOpenProTips={() => setIsProTipsOpen(true)}
-        onOpenReport={() => setIsReportModalOpen(true)}
       />
 
       <div
         ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden print:overflow-visible"
       >
-        <main className="w-full min-w-0 max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-7 space-y-6">
+        <main className="w-full min-w-0 max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
           {activeFeverAlert && (
             <div
               role="status"
-              className="rounded-2xl bg-[#FFF1F2] border border-[#FECDD3] dark:bg-[#2F1320] dark:border-[#881337] px-4 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm"
+              className="rounded-xl bg-[#FEF1F3] border border-[#FCCAD3] dark:bg-[#2A0E17] dark:border-[#881337] px-4 py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
             >
               <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-full bg-[#E11D48] text-white flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-9 h-9 rounded-lg bg-[#D91E43] text-white flex items-center justify-center shrink-0 mt-0.5">
                   <BellRing className="w-4.5 h-4.5" aria-hidden="true" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[#9F1239] dark:text-[#FDA4AF]">
+                  <p className="text-sm font-bold text-[#9F1239] dark:text-[#FDA4AF] tabular-nums">
                     {strings.alertsBanner.sustainedPrefix} {activeFeverAlert.profileName} ·{' '}
                     <span className="font-mono">
                       {formatTempFr(activeFeverAlert.value, tempUnit, language)}{' '}
@@ -1223,7 +1250,7 @@ export default function App() {
                       '{temp}',
                       `${formatTempFr(activeFeverAlert.threshold, tempUnit, language)} ${tempUnitLabel(tempUnit)}`
                     )}{' '}
-                    <span className="font-mono opacity-80">
+                    <span className="font-mono opacity-80 tabular-nums">
                       ({formatTimeFr(activeFeverAlert.timestamp, language)})
                     </span>
                   </p>
@@ -1238,7 +1265,7 @@ export default function App() {
                       setActiveProfileId(activeFeverAlert.profileId);
                       setActivePage('home');
                     }}
-                    className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-white bg-[#E11D48] hover:bg-[#BE123C] rounded-full cursor-pointer"
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-white bg-[#D91E43] hover:bg-[#B91737] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     {strings.alertsBanner.viewProfile} {activeFeverAlert.profileName}
                   </button>
@@ -1249,7 +1276,7 @@ export default function App() {
                     setBannerRefValue(String(convertTemp(activeFeverAlert.value, tempUnit)));
                     setShowBannerRefInput((v) => !v);
                   }}
-                  className="min-h-[36px] inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#162642] bg-white hover:bg-[#FFE4E6] border border-[#FECDD3] dark:text-[#FDE68A] dark:bg-[#1E0D15] dark:hover:bg-[#3B1828] dark:border-[#881337] rounded-full cursor-pointer"
+                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0F1D32] bg-white hover:bg-[#FFE4E6] border border-[#FCCAD3] dark:text-[#FDE68A] dark:bg-[#1A0910] dark:hover:bg-[#3B1523] dark:border-[#881337] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Thermometer className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>
@@ -1268,7 +1295,7 @@ export default function App() {
                     setActiveFeverAlert(null);
                     setShowBannerRefInput(false);
                   }}
-                  className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] rounded-full cursor-pointer"
+                  className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-white bg-[#0F1D32] hover:bg-[#1B2F4D] dark:bg-[#0B8A7E] dark:hover:bg-[#087066] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   {strings.alertsBanner.quickActionNote}
                 </button>
@@ -1278,7 +1305,7 @@ export default function App() {
                     setActiveFeverAlert(null);
                     setShowBannerRefInput(false);
                   }}
-                  className="min-h-[36px] inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#9F1239] bg-white hover:bg-[#FFE4E6] border border-[#FECDD3] dark:text-[#FDA4AF] dark:bg-[#1E0D15] dark:hover:bg-[#3B1828] dark:border-[#881337] rounded-full cursor-pointer"
+                  className="min-h-[36px] inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#9F1239] bg-white hover:bg-[#FFE4E6] border border-[#FCCAD3] dark:text-[#FDA4AF] dark:bg-[#1A0910] dark:hover:bg-[#3B1523] dark:border-[#881337] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{strings.alertsBanner.acknowledge}</span>
@@ -1310,7 +1337,7 @@ export default function App() {
                 );
                 setShowBannerRefInput(false);
               }}
-              className="rounded-2xl bg-[#EEF2FF] border border-[#C7D2FE] dark:bg-[#1E1B4B] dark:border-[#3730A3] px-4 py-2.5 flex flex-wrap items-center gap-2.5 text-xs"
+              className="rounded-xl bg-[#EEF2FF] border border-[#C7D2FE] dark:bg-[#151836] dark:border-[#3730A3] px-4 py-2.5 flex flex-wrap items-center gap-2.5 text-xs"
             >
               <label
                 htmlFor="banner-ref-input"
@@ -1327,11 +1354,11 @@ export default function App() {
                 value={bannerRefValue}
                 onChange={(e) => setBannerRefValue(e.target.value)}
                 required
-                className="w-24 min-h-[34px] px-2.5 py-1 rounded-lg font-mono font-bold bg-white text-[#162642] border border-[#C7D2FE] dark:bg-[#132544] dark:text-[#F1F6FA] dark:border-[#4338CA]"
+                className="w-24 min-h-[34px] px-2.5 py-1 rounded-lg font-mono font-bold bg-white text-[#0F1D32] border border-[#C7D2FE] dark:bg-[#0D1626] dark:text-[#F1F5F9] dark:border-[#4338CA]"
               />
               <button
                 type="submit"
-                className="min-h-[34px] px-3.5 py-1 rounded-full bg-[#4338CA] hover:bg-[#3730A3] text-white font-semibold cursor-pointer"
+                className="min-h-[34px] px-3.5 py-1 rounded-lg bg-[#4338CA] hover:bg-[#3730A3] text-white font-semibold cursor-pointer"
               >
                 {strings.primaryCard.refTempSaveBtn}
               </button>
@@ -1348,7 +1375,7 @@ export default function App() {
           {recoveryNotice && !activeFeverAlert && (
             <div
               role="status"
-              className="rounded-2xl bg-[#F0FDFA] border border-[#99F6E4] dark:bg-[#0D2B2C] dark:border-[#115E59] px-4 py-3 flex items-center justify-between gap-3 text-xs text-[#0F766E] dark:text-[#5EEAD4]"
+              className="rounded-xl bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] px-4 py-3 flex items-center justify-between gap-3 text-xs text-[#087066] dark:text-[#5EEAD4]"
             >
               <span className="font-medium leading-relaxed">
                 <strong>{strings.alertsBanner.recoveryTitle}</strong>{' '}
@@ -1357,7 +1384,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setRecoveryNotice(null)}
-                className="font-bold px-2 py-1 rounded cursor-pointer shrink-0"
+                className="font-semibold px-2.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer shrink-0"
               >
                 {strings.alertsBanner.acknowledge}
               </button>
@@ -1367,13 +1394,13 @@ export default function App() {
           {sessionEndReminder && (
             <div
               role="status"
-              className="rounded-2xl bg-[#F0FDFA] border border-[#99F6E4] dark:bg-[#0D2B2C] dark:border-[#115E59] px-4 py-3 flex items-center justify-between gap-3 text-xs text-[#0F766E] dark:text-[#5EEAD4]"
+              className="rounded-xl bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] px-4 py-3 flex items-center justify-between gap-3 text-xs text-[#087066] dark:text-[#5EEAD4]"
             >
               <span className="font-medium leading-relaxed">{sessionEndReminder}</span>
               <button
                 type="button"
                 onClick={() => setSessionEndReminder(null)}
-                className="font-bold px-2 py-1 rounded cursor-pointer shrink-0"
+                className="font-semibold px-2.5 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer shrink-0"
               >
                 OK
               </button>
@@ -1384,6 +1411,7 @@ export default function App() {
           {activePage !== 'profile' && (
             <ProfileBar
               language={language}
+              tempUnit={tempUnit}
               profiles={profiles}
               activeProfile={activeProfile}
               identityConfirmed={Boolean(identityConfirmedIds[activeProfile.id])}
@@ -1435,17 +1463,19 @@ export default function App() {
 
           {/* PAGE 2: HISTORY (Historique) */}
           {activePage === 'history' && (
-            <div className="space-y-6">
+            <div className="space-y-5">
               <section
-                aria-label="Sélecteur de journée"
+                aria-label={language === 'ar' ? 'اختيار اليوم' : 'Sélecteur de journée'}
                 className="biotemp-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-colors"
               >
                 <div>
-                  <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC]">
-                    Calendrier de suivi
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
+                    {language === 'ar' ? 'تقويم المتابعة' : 'Calendrier de suivi'}
                   </p>
-                  <h1 className="text-lg font-bold text-[#162642] dark:text-[#F1F6FA]">
-                    Historique thermique — {activeProfile.name}
+                  <h1 className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9] mt-0.5">
+                    {language === 'ar'
+                      ? `السجل الحراري — ${activeProfile.name}`
+                      : `Historique thermique — ${activeProfile.name}`}
                   </h1>
                 </div>
 
@@ -1460,13 +1490,15 @@ export default function App() {
                           setSelectedHistoryDay(d.id);
                           setTimeWindow(d.window);
                         }}
-                        className={`min-w-[54px] min-h-[58px] px-3 py-2 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
+                        className={`min-w-[56px] min-h-[56px] px-3 py-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                           active
-                            ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                            : 'bg-[#F3F7F9] text-[#476074] hover:bg-[#E4EDF2] dark:bg-[#162947] dark:text-[#B0C4D8] dark:hover:bg-[#1D355B]'
+                            ? 'bg-[#0F1D32] text-white border-[#0F1D32] dark:bg-[#0B8A7E] dark:border-[#0B8A7E]'
+                            : 'bg-[#F8FAFC] text-[#475B70] border-[#E1E8EE] hover:bg-[#EDF3F7] dark:bg-[#09111E] dark:text-[#9DB0C6] dark:border-[#1B2A42] dark:hover:bg-[#122038]'
                         }`}
                       >
-                        <span className="text-[11px] font-medium opacity-80">{d.dayLabel}</span>
+                        <span className="text-[11px] font-medium opacity-80">
+                          {language === 'ar' ? d.dayLabelAr : d.dayLabelFr}
+                        </span>
                         <span className="font-mono text-sm font-bold tabular-nums">{d.dateNum}</span>
                       </button>
                     );
@@ -1513,6 +1545,7 @@ export default function App() {
                 <ConnectionAndSyncCard
                   language={language}
                   profile={activeProfile}
+                  patchReminderHours={patchReminderHours}
                   alertsEnabled={alertsEnabled}
                   soundEnabled={soundEnabled}
                   smartPersistenceEnabled={smartPersistenceEnabled}
@@ -1537,6 +1570,7 @@ export default function App() {
 
               <div className="lg:col-span-6 flex flex-col [&>*]:flex-1">
                 <HardwareSpecsSection
+                  language={language}
                   activeDeviceId={activeProfile.deviceId}
                   activeDeviceName={activeProfile.deviceName}
                   activePatchLabel={activeProfile.patchLabel}
@@ -1563,6 +1597,7 @@ export default function App() {
               onOpenReport={() => setIsReportModalOpen(true)}
               onReassignRecentSegment={handleReassignRecentSegment}
               onCreateProfile={handleCreateProfile}
+              onUpdateBirthDate={handleUpdateBirthDate}
               onAddVaccination={handleAddVaccination}
               onDeleteVaccination={handleDeleteVaccination}
               onAddHealthReminder={handleAddHealthReminder}
@@ -1610,8 +1645,8 @@ export default function App() {
           )}
         </main>
 
-        <footer className="border-t border-[#E3EDF0] dark:border-[#1E3354] bg-white/65 dark:bg-[#0B172B]/70 py-4 mt-4 transition-colors no-print">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#647B8C] dark:text-[#8BA3BC]">
+        <footer className="border-t border-[#E1E8EE] dark:border-[#1B2A42] bg-white/80 dark:bg-[#09111E]/85 py-4 mt-4 transition-colors no-print">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#64798F] dark:text-[#7B91A8]">
             <span>{strings.footer.left}</span>
             <span>{strings.footer.right}</span>
           </div>
@@ -1628,6 +1663,7 @@ export default function App() {
 
       <ReplaceDeviceModal
         isOpen={isReplaceModalOpen}
+        language={language}
         profile={activeProfile}
         onClose={() => setIsReplaceModalOpen(false)}
         onConfirmReplace={handleConfirmReplaceDevice}
@@ -1643,12 +1679,15 @@ export default function App() {
 
       <PlacementGuideModal
         isOpen={isPlacementGuideOpen}
+        language={language}
         onClose={() => setIsPlacementGuideOpen(false)}
       />
 
       <ProTipsOverlay
         isOpen={isProTipsOpen}
         profile={activeProfile}
+        language={language}
+        tempUnit={tempUnit}
         identityConfirmed={Boolean(identityConfirmedIds[activeProfile.id])}
         soundEnabled={soundEnabled}
         alertsEnabled={alertsEnabled}

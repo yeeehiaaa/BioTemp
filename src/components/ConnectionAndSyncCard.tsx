@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BatteryMedium,
+  BatteryWarning,
   BellRing,
   Bluetooth,
   BluetoothOff,
   CheckCircle,
   CheckCircle2,
   ChevronDown,
+  Clock,
   HardDrive,
   Loader2,
   PauseCircle,
@@ -16,18 +18,25 @@ import {
   Router,
   ShieldCheck,
   SignalMedium,
+  TrendingDown,
   Volume2,
   VolumeX,
   Wifi,
 } from 'lucide-react';
-import { AppLanguage, ChildProfile } from '../types/biotemp';
+import { AppLanguage, ChildProfile, PatchReminderHours } from '../types/biotemp';
 import { getStrings } from '../utils/i18n';
-import { NotificationPermissionState } from '../utils/notifications';
+import {
+  NotificationPermissionState,
+  playGentleAlertChime,
+  sendLowBatterySystemNotification,
+} from '../utils/notifications';
 import { evaluateSignalContactQuality, formatTimeFr } from '../utils/temperature';
+import { BatteryHistoryChart } from './BatteryHistoryChart';
 
 interface ConnectionAndSyncCardProps {
   language?: AppLanguage;
   profile: ChildProfile;
+  patchReminderHours?: PatchReminderHours;
   alertsEnabled: boolean;
   soundEnabled: boolean;
   smartPersistenceEnabled: boolean;
@@ -50,10 +59,13 @@ interface ConnectionAndSyncCardProps {
 }
 
 const HUB_DEVICES = ['iPad Chambre', 'Ancien smartphone chevet', 'Tablette Salon'];
+const STANDARD_HOURLY_DRAIN_RATE = 0.5; // %/h -> 12%/jour (~200 h pour 100 %, ~30 h sous 15 %)
+const STANDARD_DAILY_DRAIN_RATE = STANDARD_HOURLY_DRAIN_RATE * 24;
 
 export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
   language = 'fr',
   profile,
+  patchReminderHours = 12,
   alertsEnabled,
   soundEnabled,
   smartPersistenceEnabled,
@@ -75,22 +87,132 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
   onOpenReplaceDevice,
 }) => {
   const dc = getStrings(language).deviceCopy;
+  const settingsCopy = getStrings(language).settings;
+  const demoToggleLabel = getStrings(language).primaryCard.demoToolsToggle;
   const [showDiagnostic, setShowDiagnostic] = useState(false);
   const [showSimTools, setShowSimTools] = useState(false);
+  const lowBatteryNotifiedRef = useRef<Set<string>>(new Set());
 
   const isOutOfRange = profile.connectionMode === 'out_of_range';
   const isRelayed = profile.connectionMode === 'home_hub_relayed';
   const isStandby = profile.connectionMode === 'standby_removed';
   const signalQuality = evaluateSignalContactQuality(profile, language);
 
+  const batteryTrend = useMemo(() => {
+    const series =
+      profile.batteryHistory && profile.batteryHistory.length === 7
+        ? [...profile.batteryHistory.slice(0, 6), profile.battery]
+        : Array.from({ length: 7 }, (_, i) => {
+            return Math.min(100, Math.round(profile.battery + (6 - i) * STANDARD_DAILY_DRAIN_RATE));
+          });
+
+    let totalDrop = 0;
+    let dropDays = 0;
+    for (let i = 1; i < series.length; i++) {
+      const diff = series[i - 1] - series[i];
+      if (diff > 0) {
+        totalDrop += diff;
+        dropDays += 1;
+      }
+    }
+    const avgDailyDrain = dropDays > 0 ? totalDrop / dropDays : STANDARD_DAILY_DRAIN_RATE;
+    const usableBattery = Math.max(0, profile.battery - 15);
+    const hoursAboveThreshold = Math.round(usableBattery / STANDARD_HOURLY_DRAIN_RATE);
+    const daysRemaining =
+      usableBattery === 0 ? 0 : Math.floor(hoursAboveThreshold / 24);
+
+    return {
+      series,
+      avgDailyDrain,
+      hoursAboveThreshold,
+      daysRemaining,
+    };
+  }, [profile.battery, profile.batteryHistory]);
+
+  const isLowBatteryAlert = profile.battery < 15;
+  const isBatteryCritical = isLowBatteryAlert || batteryTrend.hoursAboveThreshold <= 24;
+  const isBatteryLow =
+    !isBatteryCritical && (profile.battery <= 40 || batteryTrend.daysRemaining <= 2);
+
+  const estimatedRemainingHours = Math.max(
+    0,
+    Math.round(profile.battery / STANDARD_HOURLY_DRAIN_RATE)
+  );
+  const batteryHoursText = dc.batteryRemainingHours.replace(
+    '{hours}',
+    String(estimatedRemainingHours)
+  );
+
+  useEffect(() => {
+    const notifyKey = `${profile.id}:${profile.deviceId}`;
+    if (!isLowBatteryAlert) {
+      lowBatteryNotifiedRef.current.delete(notifyKey);
+      return;
+    }
+    if (!alertsEnabled || lowBatteryNotifiedRef.current.has(notifyKey)) {
+      return;
+    }
+    lowBatteryNotifiedRef.current.add(notifyKey);
+    sendLowBatterySystemNotification({
+      profileId: profile.id,
+      profileName: profile.name,
+      deviceName: profile.deviceName,
+      deviceId: profile.deviceId,
+      battery: profile.battery,
+      remainingHours: estimatedRemainingHours,
+      language,
+    });
+    if (soundEnabled) {
+      playGentleAlertChime(false);
+    }
+  }, [
+    isLowBatteryAlert,
+    alertsEnabled,
+    soundEnabled,
+    profile.id,
+    profile.name,
+    profile.deviceName,
+    profile.deviceId,
+    profile.battery,
+    estimatedRemainingHours,
+    language,
+  ]);
+
+  const batteryForecastText =
+    profile.battery < 15 || batteryTrend.hoursAboveThreshold === 0
+      ? dc.batteryForecastNow
+      : batteryTrend.daysRemaining < 1
+      ? language === 'ar'
+        ? `خلال ~${batteryTrend.hoursAboveThreshold} س`
+        : `Dans ~${batteryTrend.hoursAboveThreshold} h`
+      : batteryTrend.daysRemaining > 30
+      ? dc.batteryForecastMoreThan30
+      : dc.batteryForecastDays.replace('{days}', String(batteryTrend.daysRemaining));
+
+  const hoursWorn = Math.max(
+    0,
+    Math.floor((Date.now() - profile.patchAppliedAt) / (60 * 60 * 1000))
+  );
+  const patchHoursLeft = Math.max(0, patchReminderHours - hoursWorn);
+  const patchNeedsChange = hoursWorn >= patchReminderHours;
+  const patchForecastText = patchNeedsChange
+    ? dc.patchForecastNow
+    : dc.patchForecastHours.replace('{hours}', String(patchHoursLeft));
+
+  const sparkStrokeColor = isBatteryCritical
+    ? '#D91E43'
+    : isBatteryLow
+    ? '#D97706'
+    : '#0B8A7E';
+
   const permissionStatusText =
     notificationPermission === 'granted'
-      ? 'Notifications système autorisées'
+      ? settingsCopy.notifGranted
       : notificationPermission === 'denied'
-      ? 'Notifications OS bloquées (alerte onglet & sonore actives)'
+      ? settingsCopy.notifDenied
       : notificationPermission === 'unsupported'
-      ? 'Notifications OS indisponibles (alerte onglet & sonore actives)'
-      : 'Autoriser les notifications bureau en arrière-plan';
+      ? settingsCopy.notifUnsupported
+      : settingsCopy.notifDefault;
 
   return (
     <aside
@@ -100,49 +222,64 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
     >
       {/* Top Status & Centered Concentric Emblem */}
       <div className="flex flex-col items-center text-center">
-        <div className="w-full flex items-center justify-between text-xs text-[#647B8C] dark:text-[#8BA3BC] tabular-nums">
-          <span className="font-mono font-semibold text-[#162642] dark:text-[#F1F6FA]">
+        <div className="w-full flex items-center justify-between text-xs text-[#64798F] dark:text-[#8DA2B9] tabular-nums">
+          <span className="font-mono font-semibold text-[#0F1D32] dark:text-[#F1F5F9]">
             {profile.deviceName} · {profile.deviceId}
           </span>
-          <span className="inline-flex items-center gap-1 font-medium">
-            <BatteryMedium className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
-            {profile.battery} %
+          <span
+            className="inline-flex items-center gap-1.5 font-mono font-semibold text-[#0F1D32] dark:text-[#F1F5F9]"
+            title={`${dc.batteryRemainingLabel} (${dc.batteryStandardRateNote})`}
+          >
+            <BatteryMedium
+              className={`w-4 h-4 ${
+                isBatteryCritical
+                  ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                  : isBatteryLow
+                  ? 'text-[#D97706] dark:text-[#FBBF24]'
+                  : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+              }`}
+              aria-hidden="true"
+            />
+            <span>{profile.battery} %</span>
+            <span className="text-[#64798F] dark:text-[#8DA2B9] font-normal">
+              · {batteryHoursText}
+            </span>
           </span>
         </div>
 
-        {/* Concentric Soft Halo Emblem */}
+        {/* Concentric Instrument Emblem */}
         <div className="my-4 relative flex items-center justify-center">
           <div
-            className={`w-26 h-26 rounded-full flex items-center justify-center transition-colors ${
+            className={`w-24 h-24 rounded-full flex items-center justify-center transition-colors ${
               isStandby
-                ? 'bg-[#F3F7F9] dark:bg-[#162947]'
+                ? 'bg-[#F8FAFC] dark:bg-[#132036]'
                 : isOutOfRange
-                ? 'bg-[#FFF7ED] dark:bg-[#2C1C12]'
+                ? 'bg-[#FEF7EC] dark:bg-[#261909]'
                 : isRelayed
-                ? 'bg-[#EFF6FF] dark:bg-[#132544]'
-                : 'bg-[#F0FDFA] dark:bg-[#0D2B2C]'
+                ? 'bg-[#EEF5FF] dark:bg-[#0F203B]'
+                : 'bg-[#EDF9F7] dark:bg-[#0A2624]'
             }`}
           >
             <div
-              className={`w-18 h-18 rounded-full bg-white dark:bg-[#132544] shadow-[0_10px_28px_-10px_rgba(22,38,66,0.16)] dark:shadow-[0_10px_28px_-10px_rgba(2,8,20,0.6)] flex items-center justify-center border ${
+              className={`w-16 h-16 rounded-full bg-white dark:bg-[#0D1626] shadow-sm flex items-center justify-center border ${
                 isStandby
-                  ? 'border-[#DCE7EC] dark:border-[#243E63]'
+                  ? 'border-[#E1E8EE] dark:border-[#1B2A42]'
                   : isOutOfRange
-                  ? 'border-[#FED7AA] dark:border-[#7C2D12]'
+                  ? 'border-[#FCDCA8] dark:border-[#78350F]'
                   : isRelayed
-                  ? 'border-[#BFDBFE] dark:border-[#1E40AF]'
-                  : 'border-[#CCFBF1] dark:border-[#115E59]'
+                  ? 'border-[#C7DDFF] dark:border-[#1E3A6E]'
+                  : 'border-[#BEEAE4] dark:border-[#134E4A]'
               }`}
             >
               <div
-                className={`w-11 h-11 rounded-full flex items-center justify-center text-white ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
                   isStandby
-                    ? 'bg-[#647B8C]'
+                    ? 'bg-[#64798F]'
                     : isOutOfRange
-                    ? 'bg-[#F97316]'
+                    ? 'bg-[#D97706]'
                     : isRelayed
                     ? 'bg-[#2563EB]'
-                    : 'bg-[#0D9488]'
+                    : 'bg-[#0B8A7E]'
                 }`}
               >
                 {isStandby ? (
@@ -159,7 +296,7 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
           </div>
         </div>
 
-        <h2 className="text-base font-bold text-[#162642] dark:text-[#F1F6FA]">
+        <h2 className="text-base font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
           {isStandby
             ? dc.standbyPromptTitle
             : isOutOfRange
@@ -173,7 +310,7 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
             : 'Connecté en BLE'}
         </h2>
 
-        <p className="mt-1 text-xs text-[#647B8C] dark:text-[#94ACC4] leading-relaxed max-w-[300px]">
+        <p className="mt-1 text-xs text-[#64798F] dark:text-[#9DB0C6] leading-relaxed max-w-[320px]">
           {isStandby
             ? dc.standbyPromptDesc
             : isOutOfRange
@@ -188,9 +325,9 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
         </p>
 
         {!isOutOfRange && !isStandby && (
-          <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0D9488] dark:text-[#2DD4BF]">
+          <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0B8A7E] dark:text-[#2DD4BF]">
             <span
-              className="w-2 h-2 rounded-full bg-[#0D9488] dark:bg-[#2DD4BF] animate-pulse"
+              className="w-2 h-2 rounded-full bg-[#0B8A7E] dark:bg-[#2DD4BF] animate-pulse"
               aria-hidden="true"
             />
             <span>
@@ -201,14 +338,14 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
 
         {/* Signal & Contact Quality Indicator */}
         <div
-          className={`mt-3 w-full px-3.5 py-2.5 rounded-2xl border text-start flex items-start gap-2.5 text-xs ${
+          className={`mt-3 w-full px-3.5 py-2.5 rounded-xl border text-start flex items-start gap-2.5 text-xs ${
             signalQuality.status === 'oscillating'
-              ? 'bg-[#FFFBEB] border-[#FDE68A] text-[#92400E] dark:bg-[#2C1F12] dark:border-[#78350F] dark:text-[#FCD34D]'
+              ? 'bg-[#FEF7EC] border-[#FCDCA8] text-[#92400E] dark:bg-[#261909] dark:border-[#78350F] dark:text-[#FCD34D]'
               : signalQuality.status === 'stabilizing'
-              ? 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF] dark:bg-[#132544] dark:border-[#1E40AF] dark:text-[#93C5FD]'
+              ? 'bg-[#EEF5FF] border-[#C7DDFF] text-[#1E40AF] dark:bg-[#0F203B] dark:border-[#1E3A6E] dark:text-[#93C5FD]'
               : signalQuality.status === 'no_contact'
-              ? 'bg-[#F3F7F9] border-[#DCE7EC] text-[#526675] dark:bg-[#162947] dark:border-[#243E63] dark:text-[#94ACC4]'
-              : 'bg-[#F7FAFB] border-[#E6EFF2] text-[#334E68] dark:bg-[#0B172B] dark:border-[#1E3354] dark:text-[#B0C4D8]'
+              ? 'bg-[#F8FAFC] border-[#E1E8EE] text-[#475B70] dark:bg-[#09111E] dark:border-[#1B2A42] dark:text-[#9DB0C6]'
+              : 'bg-[#F8FAFC] border-[#E1E8EE] text-[#0F1D32] dark:bg-[#09111E] dark:border-[#1B2A42] dark:text-[#E2ECF5]'
           }`}
         >
           <SignalMedium
@@ -218,8 +355,8 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
                 : signalQuality.status === 'stabilizing'
                 ? 'text-[#2563EB] dark:text-[#60A5FA]'
                 : signalQuality.status === 'no_contact'
-                ? 'text-[#647B8C]'
-                : 'text-[#0D9488] dark:text-[#2DD4BF]'
+                ? 'text-[#64798F]'
+                : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
             }`}
             aria-hidden="true"
           />
@@ -232,6 +369,152 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
             </p>
           </div>
         </div>
+
+        {/* 7-Day Battery Usage Trend Sparkline & Replacement Forecast */}
+        <div
+          aria-label={dc.batteryTrendTitle}
+          className="mt-2.5 w-full px-3.5 py-3 rounded-xl border border-[#E1E8EE] bg-[#F8FAFC] dark:bg-[#09111E] dark:border-[#1B2A42] text-start space-y-2.5"
+        >
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <div className="inline-flex items-center gap-1.5 min-w-0">
+              <TrendingDown
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  isBatteryCritical
+                    ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                    : isBatteryLow
+                    ? 'text-[#D97706] dark:text-[#FBBF24]'
+                    : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+                }`}
+                aria-hidden="true"
+              />
+              <span className="font-bold text-[#0F1D32] dark:text-[#F1F5F9] truncate">
+                {dc.batteryTrendTitle}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] tabular-nums">
+              <span className="text-[#64798F] dark:text-[#8DA2B9]">
+                −{batteryTrend.avgDailyDrain.toFixed(1).replace('.', language === 'fr' ? ',' : '.')}{' '}
+                {dc.batteryPerDayUnit}
+              </span>
+              <span className="font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
+                {dc.todayLabel} · {profile.battery}%
+              </span>
+            </div>
+          </div>
+
+          <BatteryHistoryChart
+            batteryHistory={batteryTrend.series}
+            language={language}
+            todayLabel={dc.todayLabel}
+            strokeColor={sparkStrokeColor}
+          />
+
+          <div className="pt-2.5 border-t border-[#E1E8EE] dark:border-[#1B2A42] grid grid-cols-3 gap-2.5 text-start">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-[10px] text-[#64798F] dark:text-[#8DA2B9] leading-tight">
+                <BatteryMedium
+                  className={`w-3 h-3 shrink-0 ${
+                    isBatteryCritical
+                      ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                      : isBatteryLow
+                      ? 'text-[#D97706] dark:text-[#FBBF24]'
+                      : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+                  }`}
+                  aria-hidden="true"
+                />
+                <span>{dc.batteryRemainingLabel}</span>
+              </div>
+              <p
+                className={`mt-0.5 text-xs font-mono font-bold tabular-nums ${
+                  isBatteryCritical
+                    ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                    : isBatteryLow
+                    ? 'text-[#D97706] dark:text-[#FBBF24]'
+                    : 'text-[#0F1D32] dark:text-[#F1F5F9]'
+                }`}
+              >
+                {batteryHoursText}
+              </p>
+              <p className="text-[10px] font-mono text-[#64798F] dark:text-[#7B91A8] leading-tight">
+                {dc.batteryStandardRateNote}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-center">
+              <p className="text-[10px] text-[#64798F] dark:text-[#8DA2B9] leading-tight">
+                {dc.batteryForecastLabel}
+              </p>
+              <p
+                className={`mt-0.5 text-xs font-bold tabular-nums ${
+                  isBatteryCritical
+                    ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                    : isBatteryLow
+                    ? 'text-[#D97706] dark:text-[#FBBF24]'
+                    : 'text-[#0F1D32] dark:text-[#F1F5F9]'
+                }`}
+              >
+                {batteryForecastText}
+              </p>
+            </div>
+
+            <div className="min-w-0 text-end">
+              <div className="inline-flex items-center justify-end gap-1 text-[10px] text-[#64798F] dark:text-[#8DA2B9] leading-tight">
+                <Clock
+                  className={`w-3 h-3 shrink-0 ${
+                    patchNeedsChange
+                      ? 'text-[#D97706] dark:text-[#FBBF24]'
+                      : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+                  }`}
+                  aria-hidden="true"
+                />
+                <span>{dc.patchForecastLabel}</span>
+              </div>
+              <p
+                className={`mt-0.5 text-xs font-bold tabular-nums ${
+                  patchNeedsChange
+                    ? 'text-[#D97706] dark:text-[#FBBF24]'
+                    : 'text-[#0F1D32] dark:text-[#F1F5F9]'
+                }`}
+              >
+                {patchForecastText}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Specific Low-Battery Warning Banner (< 15%) */}
+        {isLowBatteryAlert && (
+          <div
+            role="alert"
+            className="mt-2.5 w-full px-3.5 py-3 rounded-xl border bg-[#FEF1F3] border-[#FCCAD3] text-[#9F1239] dark:bg-[#2A0E17] dark:border-[#881337] dark:text-[#FECDD3] text-start flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 text-xs"
+          >
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[#D91E43] text-white flex items-center justify-center shrink-0 mt-0.5">
+                <BatteryWarning className="w-4 h-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold leading-snug text-[#9F1239] dark:text-[#FDA4AF]">
+                  {dc.lowBatteryWarningTitle} · {profile.battery} %
+                </p>
+                <p className="text-[11px] opacity-95 mt-0.5 leading-relaxed">
+                  {dc.lowBatteryWarningDesc.replace('{hours}', String(estimatedRemainingHours))}
+                </p>
+              </div>
+            </div>
+
+            {onOpenReplaceDevice && (
+              <button
+                type="button"
+                onClick={onOpenReplaceDevice}
+                className="min-h-[34px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-white bg-[#D91E43] hover:bg-[#B91737] rounded-lg transition-colors whitespace-nowrap shrink-0 self-end sm:self-center cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                <span>{dc.lowBatteryReplaceAction}</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Connection Simulation & Syncing */}
@@ -239,7 +522,7 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
         {isSyncingBuffer ? (
           <div
             role="status"
-            className="p-3.5 rounded-2xl bg-[#F0FDFA] border border-[#99F6E4] dark:bg-[#0D2B2C] dark:border-[#115E59] flex items-center justify-center gap-2.5 text-xs font-semibold text-[#0F766E] dark:text-[#5EEAD4]"
+            className="p-3.5 rounded-xl bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] flex items-center justify-center gap-2.5 text-xs font-semibold text-[#087066] dark:text-[#5EEAD4]"
           >
             <Loader2 className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" />
             <span>
@@ -253,7 +536,7 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
             <button
               type="button"
               onClick={onResumeSession}
-              className="min-h-[44px] w-full px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-[#0D9488] hover:bg-[#0F766E] rounded-full transition-colors cursor-pointer"
+              className="min-h-[42px] w-full px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] rounded-xl transition-colors cursor-pointer"
             >
               {dc.resumeSessionBtn}
             </button>
@@ -261,22 +544,24 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
               <button
                 type="button"
                 onClick={onEndSession}
-                className="min-h-[44px] w-full px-4 py-2.5 text-xs sm:text-sm font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors cursor-pointer"
+                className="min-h-[42px] w-full px-4 py-2 text-xs sm:text-sm font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EFF4F8] border border-[#E1E8EE] dark:text-[#E2ECF5] dark:bg-[#132036] dark:hover:bg-[#192A46] dark:border-[#1E304D] rounded-xl transition-colors cursor-pointer"
               >
                 {dc.endSessionBtn}
               </button>
             )}
           </div>
         ) : isOutOfRange ? (
-          <div className="p-3.5 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] dark:bg-[#2C1C12] dark:border-[#7C2D12] space-y-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-[#9A3412] dark:text-[#FDBA74]">
+          <div className="p-3.5 rounded-xl bg-[#FEF7EC] border border-[#FCDCA8] dark:bg-[#261909] dark:border-[#78350F] space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-[#9A3412] dark:text-[#FCD34D]">
               <span className="inline-flex items-center gap-1.5">
                 <HardDrive className="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span>Mémoire interne</span>
+                <span>{language === 'ar' ? 'الذاكرة الداخلية' : 'Mémoire interne'}</span>
               </span>
               <span className="font-mono text-sm font-bold tabular-nums">
-                {profile.bufferedReadings.length} mesure
-                {profile.bufferedReadings.length > 1 ? 's' : ''}
+                {profile.bufferedReadings.length}{' '}
+                {language === 'ar'
+                  ? 'قراءة'
+                  : `mesure${profile.bufferedReadings.length > 1 ? 's' : ''}`}
               </span>
             </div>
 
@@ -284,17 +569,23 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
               <button
                 type="button"
                 onClick={onReconnectAndSync}
-                className="min-h-[44px] w-full px-5 py-2.5 text-sm font-semibold text-white bg-[#162642] hover:bg-[#0F1C33] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] rounded-full transition-colors cursor-pointer"
+                className="min-h-[42px] w-full px-5 py-2 text-sm font-semibold text-white bg-[#0F1D32] hover:bg-[#1A2D4A] dark:bg-[#0B8A7E] dark:hover:bg-[#087066] rounded-xl transition-colors cursor-pointer"
               >
-                Reconnecter et synchroniser ({profile.bufferedReadings.length})
+                {language === 'ar'
+                  ? `إعادة الاتصال والمزامنة (${profile.bufferedReadings.length})`
+                  : `Reconnecter et synchroniser (${profile.bufferedReadings.length})`}
               </button>
               <button
                 type="button"
                 onClick={onAddManualBufferedPoint}
-                className="min-h-[38px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#9A3412] bg-white hover:bg-[#FFEDD5] border border-[#FED7AA] dark:text-[#FDBA74] dark:bg-[#1B120C] dark:hover:bg-[#3A2416] dark:border-[#7C2D12] rounded-full transition-colors cursor-pointer"
+                className="min-h-[38px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#9A3412] bg-white hover:bg-[#FEF1DB] border border-[#FCDCA8] dark:text-[#FCD34D] dark:bg-[#1A1106] dark:hover:bg-[#33210C] dark:border-[#78350F] rounded-xl transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>+1 mesure en mémoire interne</span>
+                <span>
+                  {language === 'ar'
+                    ? '+1 قراءة في الذاكرة الداخلية'
+                    : '+1 mesure en mémoire interne'}
+                </span>
               </button>
             </div>
           </div>
@@ -306,20 +597,20 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
                   <button
                     type="button"
                     onClick={onOpenReplaceDevice}
-                    className="min-h-[42px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors cursor-pointer"
+                    className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EFF4F8] border border-[#E1E8EE] dark:text-[#E2ECF5] dark:bg-[#132036] dark:hover:bg-[#192A46] dark:border-[#1E304D] rounded-xl transition-colors cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                    <span>Changer de module</span>
+                    <span>{language === 'ar' ? 'تبديل الوحدة' : 'Changer de module'}</span>
                   </button>
                 )}
                 {onEndSession && (
                   <button
                     type="button"
                     onClick={onEndSession}
-                    className="min-h-[42px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] border border-[#99F6E4] dark:text-[#5EEAD4] dark:bg-[#0D2B2C] dark:hover:bg-[#12383A] dark:border-[#115E59] rounded-full transition-colors cursor-pointer"
+                    className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#DFF3F0] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:hover:bg-[#113936] dark:border-[#134E4A] rounded-xl transition-colors cursor-pointer"
                   >
                     <Power className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                    <span>Clôturer la session</span>
+                    <span>{dc.endSessionBtn}</span>
                   </button>
                 )}
               </div>
@@ -329,9 +620,9 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
               type="button"
               onClick={() => setShowSimTools((v) => !v)}
               aria-expanded={showSimTools}
-              className="w-full inline-flex items-center justify-center gap-1 py-1 text-[11px] font-semibold text-[#647B8C] hover:text-[#162642] dark:text-[#8BA3BC] dark:hover:text-[#F1F6FA] cursor-pointer"
+              className="w-full inline-flex items-center justify-center gap-1 py-1 text-[11px] font-semibold text-[#64798F] hover:text-[#0F1D32] dark:text-[#8DA2B9] dark:hover:text-[#F1F5F9] cursor-pointer"
             >
-              <span>Outils de test / simulation</span>
+              <span>{demoToggleLabel}</span>
               <ChevronDown
                 className={`w-3.5 h-3.5 transition-transform ${showSimTools ? 'rotate-180' : ''}`}
                 aria-hidden="true"
@@ -343,16 +634,16 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
                 <button
                   type="button"
                   onClick={onSimulateOutOfRange}
-                  className="min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#1B3358] dark:hover:bg-[#23406E] rounded-full transition-colors cursor-pointer"
+                  className="min-h-[38px] px-4 py-2 text-xs font-semibold text-white bg-[#0F1D32] hover:bg-[#1A2D4A] dark:bg-[#132036] dark:hover:bg-[#192A46] rounded-lg transition-colors cursor-pointer"
                 >
-                  Simuler l&apos;éloignement
+                  {language === 'ar' ? 'محاكاة الخروج عن النطاق' : "Simuler l'éloignement"}
                 </button>
                 <button
                   type="button"
                   onClick={onSimulateSkinRemoval}
-                  className="min-h-[40px] px-4 py-2 text-xs font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors cursor-pointer"
+                  className="min-h-[38px] px-4 py-2 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EFF4F8] border border-[#E1E8EE] dark:text-[#E2ECF5] dark:bg-[#09111E] dark:hover:bg-[#132036] dark:border-[#1B2A42] rounded-lg transition-colors cursor-pointer"
                 >
-                  Simuler retrait (Standby)
+                  {language === 'ar' ? 'محاكاة نزع اللاصقة (سكون)' : 'Simuler retrait (Standby)'}
                 </button>
               </div>
             )}
@@ -362,37 +653,37 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
         {profile.lastSyncNotice && !isSyncingBuffer && (
           <div
             role="status"
-            className="p-3 rounded-2xl bg-[#F0FDFA] border border-[#99F6E4] dark:bg-[#0D2B2C] dark:border-[#115E59] flex items-start justify-between gap-2 text-xs text-[#115E59] dark:text-[#5EEAD4]"
+            className="p-3 rounded-xl bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] flex items-start justify-between gap-2 text-xs text-[#087066] dark:text-[#5EEAD4]"
           >
             <div className="flex items-start gap-2">
-              <CheckCircle className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF] shrink-0 mt-0.5" aria-hidden="true" />
+              <CheckCircle className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0 mt-0.5" aria-hidden="true" />
               <span className="font-medium leading-relaxed">{profile.lastSyncNotice}</span>
             </div>
             <button
               type="button"
               onClick={onDismissSyncNotice}
-              className="font-bold text-[#0F766E] dark:text-[#2DD4BF] px-1.5 py-0.5 cursor-pointer"
+              className="font-bold text-[#087066] dark:text-[#2DD4BF] px-1.5 py-0.5 cursor-pointer"
             >
-              OK
+              {language === 'ar' ? 'حسناً' : 'OK'}
             </button>
           </div>
         )}
       </div>
 
       {/* System / Background Fever Notifications + Anti-False-Alarm Persistence */}
-      <div className="pt-3.5 border-t border-[#EDF3F5] dark:border-[#1E3354] space-y-2.5">
+      <div className="pt-3.5 border-t border-[#E1E8EE] dark:border-[#1B2A42] space-y-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <BellRing
               className={`w-4 h-4 shrink-0 ${
                 alertsEnabled
-                  ? 'text-[#0D9488] dark:text-[#2DD4BF]'
-                  : 'text-[#7B8FA1] dark:text-[#8BA3BC]'
+                  ? 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+                  : 'text-[#64798F] dark:text-[#8DA2B9]'
               }`}
               aria-hidden="true"
             />
-            <span className="text-sm font-semibold text-[#162642] dark:text-[#F1F6FA]">
-              Alertes bureau / arrière-plan
+            <span className="text-sm font-semibold text-[#0F1D32] dark:text-[#F1F5F9]">
+              {settingsCopy.desktopNotifLabel}
             </span>
           </div>
 
@@ -400,21 +691,17 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
             type="button"
             role="switch"
             aria-checked={alertsEnabled}
-            aria-label="Activer les notifications système de fièvre"
+            aria-label={settingsCopy.feverAlertsLabel}
             onClick={onToggleAlerts}
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
-              alertsEnabled ? 'bg-[#0D9488]' : 'bg-[#CBD8E0] dark:bg-[#243E63]'
+            className={`w-11 h-6 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E] ${
+              alertsEnabled ? 'bg-[#0B8A7E] justify-end' : 'bg-[#CBD5E1] dark:bg-[#1E304D] justify-start'
             }`}
           >
-            <span
-              className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-xs transition-transform ${
-                alertsEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
+            <span className="inline-block h-5 w-5 rounded-full bg-white shadow-xs" />
           </button>
         </div>
 
-        <p className="text-xs text-[#647B8C] dark:text-[#94ACC4] leading-relaxed">
+        <p className="text-xs text-[#64798F] dark:text-[#9DB0C6] leading-relaxed">
           {permissionStatusText}
         </p>
 
@@ -422,10 +709,10 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
           <button
             type="button"
             onClick={onToggleSound}
-            className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
+            className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
               soundEnabled
-                ? 'bg-[#F0FDFA] text-[#0F766E] border-[#99F6E4] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59]'
-                : 'bg-[#FFF7ED] text-[#9A3412] border-[#FED7AA] dark:bg-[#2C1C12] dark:text-[#FDBA74] dark:border-[#7C2D12]'
+                ? 'bg-[#EDF9F7] text-[#087066] border-[#BEEAE4] dark:bg-[#0A2624] dark:text-[#5EEAD4] dark:border-[#134E4A]'
+                : 'bg-[#FEF7EC] text-[#9A3412] border-[#FCDCA8] dark:bg-[#261909] dark:text-[#FCD34D] dark:border-[#78350F]'
             }`}
           >
             {soundEnabled ? (
@@ -433,46 +720,60 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
             ) : (
               <VolumeX className="w-3.5 h-3.5" aria-hidden="true" />
             )}
-            <span>{soundEnabled ? 'Son actif' : 'Son coupé'}</span>
+            <span>
+              {soundEnabled
+                ? language === 'ar'
+                  ? 'الصوت مفعل'
+                  : 'Son actif'
+                : language === 'ar'
+                ? 'الصوت مكتوم'
+                : 'Son coupé'}
+            </span>
           </button>
 
           <button
             type="button"
             onClick={onToggleSmartPersistence}
-            title="Évite les fausses alertes nocturnes en confirmant la persistance sur 5–10 min"
-            className={`min-h-[34px] px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
+            title={settingsCopy.antiSpikeSub}
+            className={`min-h-[34px] px-3 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
               smartPersistenceEnabled
-                ? 'bg-[#F0FDFA] text-[#0F766E] border-[#99F6E4] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59]'
-                : 'bg-[#F3F7F9] text-[#647B8C] border-[#DCE7EC] dark:bg-[#162947] dark:text-[#8BA3BC] dark:border-[#243E63]'
+                ? 'bg-[#EDF9F7] text-[#087066] border-[#BEEAE4] dark:bg-[#0A2624] dark:text-[#5EEAD4] dark:border-[#134E4A]'
+                : 'bg-[#F8FAFC] text-[#64798F] border-[#E1E8EE] dark:bg-[#132036] dark:text-[#8DA2B9] dark:border-[#1E304D]'
             }`}
           >
-            {smartPersistenceEnabled ? 'Filtre 5–10 min actif' : 'Alerte immédiate'}
+            {smartPersistenceEnabled
+              ? language === 'ar'
+                ? 'مرشح 5–10 د نشط'
+                : 'Filtre 5–10 min actif'
+              : language === 'ar'
+              ? 'تنبيه فوري'
+              : 'Alerte immédiate'}
           </button>
 
           <button
             type="button"
             onClick={onTestAlert}
-            className="min-h-[34px] px-3 py-1 text-xs font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors cursor-pointer"
+            className="min-h-[34px] px-3 py-1 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EFF4F8] border border-[#E1E8EE] dark:text-[#E2ECF5] dark:bg-[#132036] dark:hover:bg-[#192A46] dark:border-[#1E304D] rounded-lg transition-colors cursor-pointer"
           >
-            Tester l&apos;alerte
+            {settingsCopy.notifTestBtn}
           </button>
         </div>
       </div>
 
       {/* Mode Relais Domestique */}
-      <div className="pt-3.5 border-t border-[#EDF3F5] dark:border-[#1E3354]">
+      <div className="pt-3.5 border-t border-[#E1E8EE] dark:border-[#1B2A42]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Wifi
               className={`w-4 h-4 shrink-0 ${
                 profile.homeHubEnabled
-                  ? 'text-[#0D9488] dark:text-[#2DD4BF]'
-                  : 'text-[#7B8FA1] dark:text-[#8BA3BC]'
+                  ? 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+                  : 'text-[#64798F] dark:text-[#8DA2B9]'
               }`}
               aria-hidden="true"
             />
-            <span className="text-sm font-semibold text-[#162642] dark:text-[#F1F6FA]">
-              Mode Relais Domestique
+            <span className="text-sm font-semibold text-[#0F1D32] dark:text-[#F1F5F9]">
+              {language === 'ar' ? 'وضع المرحّل المنزلي' : 'Mode Relais Domestique'}
             </span>
           </div>
 
@@ -480,37 +781,41 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
             type="button"
             role="switch"
             aria-checked={profile.homeHubEnabled}
-            aria-label="Activer ou désactiver le Mode Relais Domestique"
+            aria-label={
+              language === 'ar'
+                ? 'تفعيل أو إيقاف وضع المرحّل المنزلي'
+                : 'Activer ou désactiver le Mode Relais Domestique'
+            }
             onClick={onToggleHomeHub}
-            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
-              profile.homeHubEnabled ? 'bg-[#0D9488]' : 'bg-[#CBD8E0] dark:bg-[#243E63]'
+            className={`w-11 h-6 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E] ${
+              profile.homeHubEnabled
+                ? 'bg-[#0B8A7E] justify-end'
+                : 'bg-[#CBD5E1] dark:bg-[#1E304D] justify-start'
             }`}
           >
-            <span
-              className={`pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow-xs transition-transform ${
-                profile.homeHubEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
+            <span className="inline-block h-5 w-5 rounded-full bg-white shadow-xs" />
           </button>
         </div>
 
-        <p className="mt-1.5 text-xs text-[#647B8C] dark:text-[#94ACC4] leading-relaxed">
-          Utilisez un ancien téléphone ou une tablette comme passerelle fixe pour suivre la température depuis une autre pièce.
+        <p className="mt-1.5 text-xs text-[#64798F] dark:text-[#9DB0C6] leading-relaxed">
+          {language === 'ar'
+            ? 'استخدم هاتفاً قديماً أو جهازاً لوحياً كبوابة ثابتة لمتابعة الحرارة من غرفة أخرى.'
+            : 'Utilisez un ancien téléphone ou une tablette comme passerelle fixe pour suivre la température depuis une autre pièce.'}
         </p>
 
         {profile.homeHubEnabled && (
-          <div className="mt-2.5 flex items-center justify-between gap-2 text-xs bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl px-3 py-2">
+          <div className="mt-2.5 flex items-center justify-between gap-2 text-xs bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-xl px-3 py-2">
             <label
               htmlFor="hub-select"
-              className="font-medium text-[#476074] dark:text-[#94ACC4] whitespace-nowrap"
+              className="font-medium text-[#475B70] dark:text-[#9DB0C6] whitespace-nowrap"
             >
-              Passerelle :
+              {language === 'ar' ? 'جهاز البوابة :' : 'Passerelle :'}
             </label>
             <select
               id="hub-select"
               value={profile.homeHubDeviceName}
               onChange={(e) => onChangeHomeHubDevice(e.target.value)}
-              className="text-xs font-semibold text-[#162642] dark:text-[#F1F6FA] dark:bg-[#0B172B] bg-transparent focus:outline-none cursor-pointer"
+              className="text-xs font-semibold text-[#0F1D32] dark:text-[#F1F5F9] dark:bg-[#09111E] bg-transparent focus:outline-none cursor-pointer"
             >
               {HUB_DEVICES.map((d) => (
                 <option key={d} value={d}>
@@ -523,41 +828,57 @@ export const ConnectionAndSyncCard: React.FC<ConnectionAndSyncCardProps> = ({
       </div>
 
       {/* Quick Connection & Permissions Check */}
-      <div className="pt-3 border-t border-[#EDF3F5] dark:border-[#1E3354]">
+      <div className="pt-3 border-t border-[#E1E8EE] dark:border-[#1B2A42]">
         <button
           type="button"
           onClick={() => setShowDiagnostic((v) => !v)}
-          className="w-full min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0F766E] dark:text-[#5EEAD4] hover:bg-[#F0FDFA] dark:hover:bg-[#0D2B2C] rounded-xl transition-colors cursor-pointer"
+          className="w-full min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0B8A7E] dark:text-[#5EEAD4] hover:bg-[#EDF9F7] dark:hover:bg-[#0A2624] rounded-xl transition-colors cursor-pointer"
         >
           <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
-          <span>Vérification rapide : connexion &amp; autorisations</span>
+          <span>
+            {language === 'ar'
+              ? 'فحص سريع : الاتصال والأذونات'
+              : 'Vérification rapide : connexion & autorisations'}
+          </span>
         </button>
 
         {showDiagnostic && (
-          <div className="mt-2.5 p-3 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-1.5 text-[11px] text-[#476074] dark:text-[#B0C4D8]">
+          <div className="mt-2.5 p-3 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-1.5 text-[11px] text-[#475B70] dark:text-[#9DB0C6]">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#0D9488]" aria-hidden="true" />
-                Liaison Bluetooth BLE ({profile.deviceId})
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#0B8A7E]" aria-hidden="true" />
+                {language === 'ar'
+                  ? `الربط عبر البلوتوث BLE (${profile.deviceId})`
+                  : `Liaison Bluetooth BLE (${profile.deviceId})`}
               </span>
-              <span className="font-mono font-semibold">
-                {isOutOfRange ? 'Tampon actif' : isStandby ? 'Veille' : 'OK'}
+              <span className="font-mono font-semibold text-[#0F1D32] dark:text-[#F1F5F9]">
+                {isOutOfRange
+                  ? language === 'ar'
+                    ? 'ذاكرة مؤقتة'
+                    : 'Tampon actif'
+                  : isStandby
+                  ? language === 'ar'
+                    ? 'سكون'
+                    : 'Veille'
+                  : 'OK'}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#0D9488]" aria-hidden="true" />
-                Dernière connexion connue
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#0B8A7E]" aria-hidden="true" />
+                {language === 'ar' ? 'آخر اتصال معروف' : 'Dernière connexion connue'}
               </span>
-              <span className="font-mono">{formatTimeFr(profile.lastConnectedAt)}</span>
+              <span className="font-mono">{formatTimeFr(profile.lastConnectedAt, language)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#0D9488]" aria-hidden="true" />
-                Optimisation batterie (arrière-plan)
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#0B8A7E]" aria-hidden="true" />
+                {language === 'ar'
+                  ? 'تحسين البطارية (في الخلفية)'
+                  : 'Optimisation batterie (arrière-plan)'}
               </span>
-              <span className="font-semibold text-[#0F766E] dark:text-[#5EEAD4]">
-                Exclue recommandée
+              <span className="font-semibold text-[#0B8A7E] dark:text-[#5EEAD4]">
+                {language === 'ar' ? 'يوصى بالاستثناء' : 'Exclue recommandée'}
               </span>
             </div>
           </div>

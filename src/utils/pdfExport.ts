@@ -609,7 +609,14 @@ export function exportFullHistoryPdf(
   } else {
     drawNotesHeader();
     sortedNotes.forEach((note, idx) => {
-      const obsLines = doc.splitTextToSize(pdfSafeText(note.text || '-'), contentW - 99);
+      const refSuffix =
+        typeof note.referenceTemp === 'number'
+          ? ` [Ref. ${formatTempFr(note.referenceTemp, tempUnit)} ${unitLabel}]`
+          : '';
+      const obsLines = doc.splitTextToSize(
+        pdfSafeText(`${note.text || '-'}${refSuffix}`),
+        contentW - 99
+      );
       const rowH = Math.max(7.5, obsLines.length * 4.2 + 3.5);
       if (y + rowH > pageH - footerReserved) {
         doc.addPage();

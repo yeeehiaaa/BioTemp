@@ -180,7 +180,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
           (slice.reduce((sum, r) => sum + r.value, 0) / slice.length).toFixed(1)
         );
         buckets.push({
-          label: formatTimeFr(slice[0].timestamp),
+          label: formatTimeFr(slice[0].timestamp, language),
           avg,
           status: getTemperatureStatus(avg, profile.threshold),
         });
@@ -197,7 +197,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
       feverPct: Math.round((fever / total) * 100),
       buckets,
     };
-  }, [readings, profile.threshold]);
+  }, [readings, profile.threshold, language]);
 
   if (!isOpen) return null;
 
@@ -205,33 +205,60 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
   const sortedNotes = profile.notes.slice().sort((a, b) => b.timestamp - a.timestamp);
 
   const buildPlainTextSummary = () => {
+    const isAr = language === 'ar';
+    const refLabel = isAr ? 'المرجعي' : 'Réf.';
     const lines = [
-      `RÉSUMÉ THERMIQUE BIOTEMP — ${profile.name} (${profile.ageLabel})`,
-      `Module : ${profile.deviceName} (${profile.deviceId}) | Patch : ${profile.patchLabel}`,
-      `Seuil d'alerte configuré : ${formatTempFr(profile.threshold, tempUnit, language)} ${unitSuffix}`,
-      `Dernière mesure : ${
-        latest
-          ? `${formatTempFr(latest.value, tempUnit, language)} ${unitSuffix} (${formatDateTimeFr(
-              latest.timestamp,
-              language
-            )})`
-          : '—'
-      }`,
-      `Statistiques (historique complet) : Min ${formatTempFr(
-        stats.min,
-        tempUnit,
-        language
-      )} ${unitSuffix} | Moy ${formatTempFr(
-        stats.avg,
-        tempUnit,
-        language
-      )} ${unitSuffix} | Max ${formatTempFr(stats.max, tempUnit, language)} ${unitSuffix}`,
+      isAr
+        ? `الملخص الحراري BIOTEMP — ${profile.name} (${profile.ageLabel})`
+        : `RÉSUMÉ THERMIQUE BIOTEMP — ${profile.name} (${profile.ageLabel})`,
+      isAr
+        ? `الوحدة: ${profile.deviceName} (${profile.deviceId}) | اللاصقة: ${profile.patchLabel}`
+        : `Module : ${profile.deviceName} (${profile.deviceId}) | Patch : ${profile.patchLabel}`,
+      isAr
+        ? `عتبة التنبيه المضبوطة: ${formatTempFr(profile.threshold, tempUnit, language)} ${unitSuffix}`
+        : `Seuil d'alerte configuré : ${formatTempFr(profile.threshold, tempUnit, language)} ${unitSuffix}`,
+      isAr
+        ? `آخر قياس: ${
+            latest
+              ? `${formatTempFr(latest.value, tempUnit, language)} ${unitSuffix} (${formatDateTimeFr(
+                  latest.timestamp,
+                  language
+                )})`
+              : '—'
+          }`
+        : `Dernière mesure : ${
+            latest
+              ? `${formatTempFr(latest.value, tempUnit, language)} ${unitSuffix} (${formatDateTimeFr(
+                  latest.timestamp,
+                  language
+                )})`
+              : '—'
+          }`,
+      isAr
+        ? `الإحصائيات (السجل الكامل): الأدنى ${formatTempFr(
+            stats.min,
+            tempUnit,
+            language
+          )} ${unitSuffix} | المتوسط ${formatTempFr(
+            stats.avg,
+            tempUnit,
+            language
+          )} ${unitSuffix} | الأعلى ${formatTempFr(stats.max, tempUnit, language)} ${unitSuffix}`
+        : `Statistiques (historique complet) : Min ${formatTempFr(
+            stats.min,
+            tempUnit,
+            language
+          )} ${unitSuffix} | Moy ${formatTempFr(
+            stats.avg,
+            tempUnit,
+            language
+          )} ${unitSuffix} | Max ${formatTempFr(stats.max, tempUnit, language)} ${unitSuffix}`,
       '',
-      'JOURNAL MÉDICAL :',
+      isAr ? 'السجل الطبي :' : 'JOURNAL MÉDICAL :',
       ...sortedNotes.map((n) => {
         const refPart =
           typeof n.referenceTemp === 'number'
-            ? ` (Réf. ${formatTempFr(n.referenceTemp, tempUnit, language)} ${unitSuffix})`
+            ? ` (${refLabel} ${formatTempFr(n.referenceTemp, tempUnit, language)} ${unitSuffix})`
             : '';
         return `- ${formatDateTimeFr(n.timestamp, language)} | ${formatTempFr(
           n.temperatureAtTime,
@@ -240,7 +267,9 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
         )} ${unitSuffix}${refPart} | ${n.category} : ${n.text}`;
       }),
       '',
-      'Note : Mesure cutanée calibrée sous l’aisselle (outil de suivi domestique ne remplaçant pas un avis médical).',
+      isAr
+        ? 'ملاحظة: قياس جلدي معاير تحت الإبط (أداة متابعة منزلية لا تغني عن الفحص الطبي).'
+        : 'Note : Mesure cutanée calibrée sous l’aisselle (outil de suivi domestique ne remplaçant pas un avis médical).',
     ];
     return lines.join('\n');
   };
@@ -345,76 +374,80 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="doctor-summary-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F2928]/45 dark:bg-[#040914]/70 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1D32]/45 dark:bg-[#030712]/75 backdrop-blur-xs"
     >
-      <div className="bg-white dark:bg-[#0F1E36] border border-[#DCE6E5] dark:border-[#1E3354] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-xl">
-        <div className="px-6 py-4 border-b border-[#E8EFEF] dark:border-[#1E3354] flex items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#0D1626] border border-[#E1E8EE] dark:border-[#1B2A42] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div className="px-6 py-4 border-b border-[#E1E8EE] dark:border-[#1B2A42] flex items-center justify-between gap-4">
           <div>
-            <h2 id="doctor-summary-title" className="text-lg font-bold text-[#0F2928] dark:text-[#F1F6FA]">
-              Aperçu du résumé médical — {profile.name}
+            <h2 id="doctor-summary-title" className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
+              {language === 'ar'
+                ? `ملخص المتابعة الطبية — ${profile.name}`
+                : `Aperçu du résumé médical — ${profile.name}`}
             </h2>
-            <p className="text-xs text-[#52666A] dark:text-[#8BA3BC] tabular-nums">
-              {profile.ageLabel} · {profile.deviceName} ({profile.deviceId}) · {readings.length} relevés
+            <p className="text-xs text-[#64798F] dark:text-[#7B91A8] tabular-nums">
+              {profile.ageLabel} · {profile.deviceName} ({profile.deviceId}) · {readings.length}{' '}
+              {language === 'ar' ? 'قراءة' : 'relevés'}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer l'aperçu médical"
-            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#52666A] hover:bg-[#F3F7F7] hover:text-[#0F2928] dark:text-[#8BA3BC] dark:hover:bg-[#162947] dark:hover:text-[#F1F6FA] cursor-pointer"
+            aria-label={language === 'ar' ? 'إغلاق الملخص الطبي' : "Fermer l'aperçu médical"}
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-[#475B70] hover:bg-[#F4F7F9] hover:text-[#0F1D32] dark:text-[#9DB0C6] dark:hover:bg-[#122038] dark:hover:text-[#F1F5F9] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
         <div className="p-6 overflow-y-auto space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354]">
-              <p className="text-xs text-[#52666A] dark:text-[#8BA3BC]">
+          {/* 4-column unified telemetry bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] divide-y sm:divide-y-0 sm:divide-x divide-[#E1E8EE] dark:divide-[#1B2A42]">
+            <div className="p-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
                 {language === 'ar' ? 'الحالية' : 'Actuelle'}
               </p>
-              <p className="mt-1 font-mono text-lg font-bold text-[#0F2928] dark:text-[#F1F6FA] tabular-nums">
+              <p className="mt-1 font-mono text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
                 {latest ? `${formatTempFr(latest.value, tempUnit, language)} ${unitSuffix}` : '—'}
               </p>
             </div>
-            <div className="p-3 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354]">
-              <p className="text-xs text-[#52666A] dark:text-[#8BA3BC]">
+            <div className="p-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
                 {language === 'ar' ? 'الأدنى' : 'Minimum'}
               </p>
-              <p className="mt-1 font-mono text-lg font-bold text-[#0F766E] dark:text-[#5EEAD4] tabular-nums">
+              <p className="mt-1 font-mono text-lg font-bold text-[#0B8A7E] dark:text-[#2DD4BF] tabular-nums">
                 {formatTempFr(stats.min, tempUnit, language)} {unitSuffix}
               </p>
             </div>
-            <div className="p-3 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354]">
-              <p className="text-xs text-[#52666A] dark:text-[#8BA3BC]">
+            <div className="p-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
                 {language === 'ar' ? 'الأعلى' : 'Maximum'}
               </p>
-              <p className="mt-1 font-mono text-lg font-bold text-[#BE123C] dark:text-[#FDA4AF] tabular-nums">
+              <p className="mt-1 font-mono text-lg font-bold text-[#D91E43] dark:text-[#FB7185] tabular-nums">
                 {formatTempFr(stats.max, tempUnit, language)} {unitSuffix}
               </p>
             </div>
-            <div className="p-3 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354]">
-              <p className="text-xs text-[#52666A] dark:text-[#8BA3BC]">
+            <div className="p-3.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
                 {language === 'ar' ? 'تجاوز العتبة' : 'Relevés ≥ seuil'}
               </p>
-              <p className="mt-1 font-mono text-lg font-bold text-[#0F2928] dark:text-[#F1F6FA] tabular-nums">
+              <p className="mt-1 font-mono text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
                 {stats.aboveThresholdCount}
               </p>
             </div>
           </div>
 
           {/* Graphique 1 : Courbe complète incluse dans le PDF */}
-          <div className="p-4 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-2">
+          <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-bold text-[#0F2928] dark:text-[#F1F6FA] flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+              <h3 className="text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-1.5">
+                <Activity className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
                 <span>
                   {language === 'ar'
                     ? 'المنحنى الحراري الكامل (مرفق في PDF)'
                     : 'Courbe thermique complète (incluse dans le PDF)'}
                 </span>
               </h3>
-              <span className="text-[11px] text-[#52666A] dark:text-[#8BA3BC] tabular-nums">
+              <span className="text-[11px] font-mono text-[#64798F] dark:text-[#7B91A8] tabular-nums">
                 {language === 'ar' ? 'المتوسط' : 'Moy'}{' '}
                 {formatTempFr(stats.avg, tempUnit, language)} {unitSuffix} ·{' '}
                 {language === 'ar' ? 'العتبة' : 'Seuil'}{' '}
@@ -422,7 +455,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
               </span>
             </div>
 
-            <div className="w-full overflow-x-auto">
+            <div dir="ltr" className="w-full overflow-x-auto">
               <svg
                 viewBox={`0 0 ${chartData.width} ${chartData.height}`}
                 className="w-full h-auto min-w-[440px]"
@@ -431,8 +464,8 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
               >
                 <defs>
                   <linearGradient id="modalCurveGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#14B8A6" stopOpacity="0.24" />
-                    <stop offset="100%" stopColor="#14B8A6" stopOpacity="0.02" />
+                    <stop offset="0%" stopColor="#0B8A7E" stopOpacity="0.24" />
+                    <stop offset="100%" stopColor="#0B8A7E" stopOpacity="0.02" />
                   </linearGradient>
                 </defs>
 
@@ -442,7 +475,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                     y={chartData.padTop}
                     width={chartData.plotW}
                     height={Math.max(0, chartData.thresholdY - chartData.padTop)}
-                    className="fill-[#FFF1F2] dark:fill-[#4C0519]/35"
+                    className="fill-[#FEF1F3] dark:fill-[#4C0519]/35"
                     opacity="0.7"
                   />
                 )}
@@ -454,14 +487,14 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                       y1={tick.y}
                       x2={chartData.width - chartData.padRight}
                       y2={tick.y}
-                      className="stroke-[#E6EFF2] dark:stroke-[#1E3354]"
+                      className="stroke-[#E1E8EE] dark:stroke-[#1B2A42]"
                       strokeWidth="1"
                     />
                     <text
                       x={chartData.padLeft - 6}
                       y={tick.y + 3.5}
                       textAnchor="end"
-                      className="fill-[#647B8C] dark:fill-[#8BA3BC] text-[10px] font-mono"
+                      className="fill-[#64798F] dark:fill-[#7B91A8] text-[10px] font-mono"
                     >
                       {tick.label}
                     </text>
@@ -474,7 +507,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                     x={tick.x}
                     y={chartData.height - 6}
                     textAnchor="middle"
-                    className="fill-[#647B8C] dark:fill-[#8BA3BC] text-[10px] font-mono"
+                    className="fill-[#64798F] dark:fill-[#7B91A8] text-[10px] font-mono"
                   >
                     {tick.label}
                   </text>
@@ -485,7 +518,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                   y1={chartData.thresholdY}
                   x2={chartData.width - chartData.padRight}
                   y2={chartData.thresholdY}
-                  className="stroke-[#E11D48] dark:stroke-[#FB7185]"
+                  className="stroke-[#D91E43] dark:stroke-[#FB7185]"
                   strokeWidth="1.4"
                   strokeDasharray="5 4"
                 />
@@ -495,7 +528,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                   <path
                     d={chartData.linePath}
                     fill="none"
-                    className="stroke-[#0D9488] dark:stroke-[#2DD4BF]"
+                    className="stroke-[#0B8A7E] dark:stroke-[#2DD4BF]"
                     strokeWidth="2.4"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -508,7 +541,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                     cx={pt.x}
                     cy={pt.y}
                     r={pt.isAbove || pt.isSynced ? 3.5 : 2.5}
-                    fill={pt.isAbove ? '#E11D48' : pt.isSynced ? '#2563EB' : '#0D9488'}
+                    fill={pt.isAbove ? '#D91E43' : pt.isSynced ? '#2563EB' : '#0B8A7E'}
                   />
                 ))}
 
@@ -522,7 +555,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                       className={
                         pin.refY !== null
                           ? 'stroke-[#4F46E5] dark:stroke-[#818CF8]'
-                          : 'stroke-[#162642] dark:stroke-[#5EEAD4]'
+                          : 'stroke-[#0F1D32] dark:stroke-[#5EEAD4]'
                       }
                       strokeWidth="1"
                       strokeOpacity="0.45"
@@ -534,7 +567,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                         width={9}
                         height={9}
                         transform={`rotate(45 ${pin.x} ${pin.refY})`}
-                        className="fill-[#4F46E5] dark:fill-[#818CF8] stroke-white dark:stroke-[#0F1E36]"
+                        className="fill-[#4F46E5] dark:fill-[#818CF8] stroke-white dark:stroke-[#0D1626]"
                         strokeWidth="1.4"
                       />
                     )}
@@ -542,8 +575,8 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                       cx={pin.x}
                       cy={chartData.padTop + 6}
                       r="7"
-                      className="fill-white dark:fill-[#132544]"
-                      stroke={pin.refY !== null ? '#4F46E5' : '#0D9488'}
+                      className="fill-white dark:fill-[#0D1626]"
+                      stroke={pin.refY !== null ? '#4F46E5' : '#0B8A7E'}
                       strokeWidth="1.5"
                     />
                     <text
@@ -553,7 +586,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                       className={`text-[8px] font-bold ${
                         pin.refY !== null
                           ? 'fill-[#4338CA] dark:fill-[#A5B4FC]'
-                          : 'fill-[#0D9488] dark:fill-[#5EEAD4]'
+                          : 'fill-[#0B8A7E] dark:fill-[#5EEAD4]'
                       }`}
                     >
                       {pin.label}
@@ -566,47 +599,49 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
 
           {/* Graphique 2 : Répartition des états et profil horaire */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="p-4 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-2.5">
-              <h3 className="text-xs font-bold text-[#0F2928] dark:text-[#F1F6FA] flex items-center gap-1.5">
-                <BarChart3 className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
-                <span>Répartition par zone thermique</span>
+            <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-2.5">
+              <h3 className="text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-1.5">
+                <BarChart3 className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
+                <span>
+                  {language === 'ar' ? 'التوزيع حسب النطاق الحراري' : 'Répartition par zone thermique'}
+                </span>
               </h3>
               <div className="space-y-2 text-xs">
                 <div>
-                  <div className="flex justify-between text-[#354E52] dark:text-[#B0C4D8] mb-1 tabular-nums">
-                    <span>Normale</span>
+                  <div className="flex justify-between text-[#475B70] dark:text-[#9DB0C6] mb-1 tabular-nums">
+                    <span>{language === 'ar' ? 'طبيعية' : 'Normale'}</span>
                     <span className="font-mono font-semibold">{distribution.normal} ({distribution.normalPct}%)</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#E6EFF2] dark:bg-[#162947] overflow-hidden">
+                  <div className="h-2 rounded-full bg-[#E1E8EE] dark:bg-[#1B2A42] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[#0D9488]"
+                      className="h-full rounded-full bg-[#0B8A7E]"
                       style={{ width: `${distribution.normalPct}%` }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-[#354E52] dark:text-[#B0C4D8] mb-1 tabular-nums">
-                    <span>Légère hausse</span>
+                  <div className="flex justify-between text-[#475B70] dark:text-[#9DB0C6] mb-1 tabular-nums">
+                    <span>{language === 'ar' ? 'ارتفاع طفيف' : 'Légère hausse'}</span>
                     <span className="font-mono font-semibold">{distribution.elevated} ({distribution.elevatedPct}%)</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#E6EFF2] dark:bg-[#162947] overflow-hidden">
+                  <div className="h-2 rounded-full bg-[#E1E8EE] dark:bg-[#1B2A42] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[#EA580C]"
+                      className="h-full rounded-full bg-[#D97706]"
                       style={{ width: `${distribution.elevatedPct}%` }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="flex justify-between text-[#354E52] dark:text-[#B0C4D8] mb-1 tabular-nums">
+                  <div className="flex justify-between text-[#475B70] dark:text-[#9DB0C6] mb-1 tabular-nums">
                     <span>
                       {language === 'ar' ? 'ارتفاع' : 'Fièvre'} ≥{' '}
                       {formatTempFr(profile.threshold, tempUnit, language)} {unitSuffix}
                     </span>
                     <span className="font-mono font-semibold">{distribution.fever} ({distribution.feverPct}%)</span>
                   </div>
-                  <div className="h-2 rounded-full bg-[#E6EFF2] dark:bg-[#162947] overflow-hidden">
+                  <div className="h-2 rounded-full bg-[#E1E8EE] dark:bg-[#1B2A42] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-[#E11D48]"
+                      className="h-full rounded-full bg-[#D91E43]"
                       style={{ width: `${distribution.feverPct}%` }}
                     />
                   </div>
@@ -614,22 +649,22 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#F8FAFA] border border-[#E5EEED] dark:bg-[#0B172B] dark:border-[#1E3354] flex flex-col justify-between gap-2">
-              <h3 className="text-xs font-bold text-[#0F2928] dark:text-[#F1F6FA]">
+            <div className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] flex flex-col justify-between gap-2">
+              <h3 className="text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
                 {language === 'ar' ? 'المتوسط حسب الفترة الزمنية' : 'Moyenne par tranche chronologique'}
               </h3>
-              <div className="flex items-end justify-between gap-1.5 h-24 pt-2">
+              <div dir="ltr" className="flex items-end justify-between gap-1.5 h-24 pt-2">
                 {distribution.buckets.map((b, idx) => {
                   const pct = Math.min(100, Math.max(18, ((b.avg - 35.5) / 4.5) * 100));
                   const barColor =
                     b.status === 'high_fever'
-                      ? 'bg-[#E11D48]'
+                      ? 'bg-[#D91E43]'
                       : b.status === 'elevated'
-                      ? 'bg-[#EA580C]'
-                      : 'bg-[#0D9488]';
+                      ? 'bg-[#D97706]'
+                      : 'bg-[#0B8A7E]';
                   return (
                     <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                      <span className="text-[9px] font-mono text-[#52666A] dark:text-[#8BA3BC] tabular-nums">
+                      <span className="text-[9px] font-mono text-[#475B70] dark:text-[#9DB0C6] tabular-nums">
                         {formatTempFr(b.avg, tempUnit, language)}
                       </span>
                       <div className="w-full max-w-[22px] flex-1 flex items-end">
@@ -638,7 +673,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                           style={{ height: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-[9px] font-mono text-[#647B8C] dark:text-[#8BA3BC] tabular-nums">
+                      <span className="text-[9px] font-mono text-[#64798F] dark:text-[#7B91A8] tabular-nums">
                         {b.label}
                       </span>
                     </div>
@@ -649,14 +684,14 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-[#0F2928] dark:text-[#F1F6FA] mb-2">
+            <h3 className="text-sm font-semibold text-[#0F1D32] dark:text-[#F1F5F9] mb-2">
               {language === 'ar'
                 ? `الأحداث والملاحظات السريرية (${sortedNotes.length})`
                 : `Événements et notes cliniques horodatées (${sortedNotes.length})`}
             </h3>
-            <div className="divide-y divide-[#E8EFEF] dark:divide-[#1E3354] border border-[#E5EEED] dark:border-[#1E3354] rounded-xl px-4">
+            <div className="divide-y divide-[#E1E8EE] dark:divide-[#1B2A42] border border-[#E1E8EE] dark:border-[#1B2A42] rounded-xl px-4">
               {sortedNotes.length === 0 ? (
-                <p className="py-4 text-xs text-[#52666A] dark:text-[#8BA3BC]">
+                <p className="py-4 text-xs text-[#64798F] dark:text-[#7B91A8]">
                   {language === 'ar'
                     ? 'لا توجد ملاحظات سريرية مسجلة.'
                     : 'Aucune note clinique enregistrée.'}
@@ -668,17 +703,18 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
                     className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs"
                   >
                     <div>
-                      <span className="font-semibold text-[#0F766E] dark:text-[#5EEAD4]">
+                      <span className="font-semibold text-[#087066] dark:text-[#5EEAD4]">
                         {n.category}
                       </span>
-                      <span className="text-[#52666A] dark:text-[#94ACC4]"> — {n.text}</span>
+                      <span className="text-[#475B70] dark:text-[#9DB0C6]"> — {n.text}</span>
                     </div>
-                    <div className="font-mono text-[#354E52] dark:text-[#B0C4D8] tabular-nums whitespace-nowrap shrink-0">
+                    <div className="font-mono text-[#475B70] dark:text-[#9DB0C6] tabular-nums whitespace-nowrap shrink-0">
                       {formatDateTimeFr(n.timestamp, language)} ·{' '}
                       {formatTempFr(n.temperatureAtTime, tempUnit, language)} {unitSuffix}
                       {typeof n.referenceTemp === 'number' && (
-                        <span className="ml-1.5 text-[#4338CA] dark:text-[#A5B4FC]">
-                          (Réf. {formatTempFr(n.referenceTemp, tempUnit, language)} {unitSuffix})
+                        <span className="ms-1.5 text-[#4338CA] dark:text-[#A5B4FC]">
+                          ({language === 'ar' ? 'المرجعي' : 'Réf.'}{' '}
+                          {formatTempFr(n.referenceTemp, tempUnit, language)} {unitSuffix})
                         </span>
                       )}
                     </div>
@@ -688,19 +724,19 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
             </div>
           </div>
 
-          <p className="text-xs text-[#52666A] dark:text-[#8BA3BC] leading-relaxed">
+          <p className="text-xs text-[#64798F] dark:text-[#7B91A8] leading-relaxed">
             {language === 'ar'
               ? 'قياس جلدي معاير تحت الإبط • أداة متابعة منزلية مساعدة لا تغني عن ميزان مرجعي أو الفحص الطبي.'
               : "Mesure cutanée calibrée sous l'aisselle • Outil de suivi domestique ne remplaçant pas un thermomètre de référence ni l'avis médical."}
           </p>
         </div>
 
-        <div className="px-6 py-4 bg-[#F8FAFA] dark:bg-[#0B172B] border-t border-[#E8EFEF] dark:border-[#1E3354] flex flex-wrap items-center justify-between gap-2.5 no-print">
+        <div className="px-6 py-4 bg-[#F8FAFC] dark:bg-[#09111E] border-t border-[#E1E8EE] dark:border-[#1B2A42] flex flex-wrap items-center justify-between gap-2.5 no-print">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleShareSummary}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#1B3358] dark:hover:bg-[#23406E] rounded-xl transition-colors cursor-pointer"
+              className="min-h-[38px] inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#0F1D32] hover:bg-[#1B2F4D] dark:bg-[#1B2A42] dark:hover:bg-[#243958] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {sharedStatus ? (
                 <>
@@ -718,7 +754,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
             <button
               type="button"
               onClick={handleCopyText}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-semibold text-[#0F766E] bg-[#ECFDF5] hover:bg-[#DDF5EE] border border-[#A7F3D0] dark:text-[#5EEAD4] dark:bg-[#0D2B2C] dark:hover:bg-[#12383A] dark:border-[#115E59] rounded-xl transition-colors cursor-pointer"
+              className="min-h-[38px] inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#D8F2EE] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:hover:bg-[#103835] dark:border-[#134E4A] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {copied ? (
                 <>
@@ -736,7 +772,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
             <button
               type="button"
               onClick={handleDownloadTxt}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-[#112A2E] bg-white hover:bg-[#F3F7F7] border border-[#DCE6E5] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] dark:border-[#243E63] rounded-xl transition-colors cursor-pointer"
+              className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#0F1D32] bg-white hover:bg-[#F4F7F9] border border-[#E1E8EE] dark:text-[#E2E8F0] dark:bg-[#0D1626] dark:hover:bg-[#122038] dark:border-[#1E304D] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>TXT</span>
@@ -745,7 +781,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
             <button
               type="button"
               onClick={handleDownloadCsv}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-[#112A2E] bg-white hover:bg-[#F3F7F7] border border-[#DCE6E5] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] dark:border-[#243E63] rounded-xl transition-colors cursor-pointer"
+              className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#0F1D32] bg-white hover:bg-[#F4F7F9] border border-[#E1E8EE] dark:text-[#E2E8F0] dark:bg-[#0D1626] dark:hover:bg-[#122038] dark:border-[#1E304D] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Download className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>CSV</span>
@@ -754,7 +790,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
             <button
               type="button"
               onClick={() => window.print()}
-              className="min-h-[40px] inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-[#112A2E] bg-white hover:bg-[#F3F7F7] border border-[#DCE6E5] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] dark:border-[#243E63] rounded-xl transition-colors cursor-pointer"
+              className="min-h-[38px] inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#0F1D32] bg-white hover:bg-[#F4F7F9] border border-[#E1E8EE] dark:text-[#E2E8F0] dark:bg-[#0D1626] dark:hover:bg-[#122038] dark:border-[#1E304D] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <Printer className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>{language === 'ar' ? 'طباعة' : 'Imprimer'}</span>
@@ -764,7 +800,7 @@ export const DoctorSummaryModal: React.FC<DoctorSummaryModalProps> = ({
           <button
             type="button"
             onClick={handleExportPdf}
-            className="min-h-[40px] inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#0F766E] hover:bg-[#0D655E] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="min-h-[38px] inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] rounded-lg shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {pdfExported ? (
               <>

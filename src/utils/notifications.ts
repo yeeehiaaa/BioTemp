@@ -172,3 +172,65 @@ export function sendRecoverySystemNotification(params: {
     return false;
   }
 }
+
+export function sendLowBatterySystemNotification(params: {
+  profileId: string;
+  profileName: string;
+  deviceName: string;
+  deviceId: string;
+  battery: number;
+  remainingHours: number;
+  language?: AppLanguage;
+  onSelectProfile?: () => void;
+}): boolean {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return false;
+  }
+  if (Notification.permission !== 'granted') {
+    return false;
+  }
+
+  const lang = params.language ?? 'fr';
+  const title =
+    lang === 'ar'
+      ? `بطارية منخفضة (${params.battery} %) — ${params.deviceName}`
+      : `Batterie faible (${params.battery} %) — ${params.deviceName}`;
+  const body =
+    lang === 'ar'
+      ? `مستشعر ${params.profileName} (${params.deviceId}) لم يتبقَّ له سوى ~${params.remainingHours} ساعة. يُرجى شحن الجهاز أو استبدال الوحدة قريباً.`
+      : `Le capteur de ${params.profileName} (${params.deviceId}) n'a plus que ~${params.remainingHours} h d'autonomie. Pensez à le recharger ou à changer de module prochainement.`;
+
+  try {
+    const options: NotificationOptions & { renotify?: boolean } = {
+      body,
+      tag: `biotemp-low-battery-${params.profileId}-${params.deviceId}`,
+      requireInteraction: true,
+      renotify: true,
+    };
+    const notification = new Notification(title, options);
+    notification.onclick = () => {
+      try {
+        window.focus();
+      } catch {
+        // ignore
+      }
+      params.onSelectProfile?.();
+      notification.close();
+    };
+    return true;
+  } catch {
+    try {
+      const fallback = new Notification(title, {
+        body,
+        tag: `biotemp-low-battery-${params.profileId}-${params.deviceId}`,
+      });
+      fallback.onclick = () => {
+        params.onSelectProfile?.();
+        fallback.close();
+      };
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}

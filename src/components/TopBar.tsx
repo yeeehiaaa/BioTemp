@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Lightbulb, Moon, Settings2, Sun } from 'lucide-react';
+import { Lightbulb, Moon, Settings2, Sun } from 'lucide-react';
 import { AppLanguage, ChildProfile } from '../types/biotemp';
 import { getStrings } from '../utils/i18n';
 import { NightModePolicy, SleepSchedule } from '../utils/nightMode';
@@ -24,7 +24,6 @@ interface TopBarProps {
   onToggleSimulateNightTime: () => void;
   onSelectPage: (page: AppPage) => void;
   onOpenProTips: () => void;
-  onOpenReport: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -45,7 +44,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleSimulateNightTime,
   onSelectPage,
   onOpenProTips,
-  onOpenReport,
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const t = getStrings(language).nav;
@@ -57,17 +55,17 @@ export const TopBar: React.FC<TopBarProps> = ({
   ];
 
   return (
-    <header className="shrink-0 relative z-30 w-full bg-white/92 dark:bg-[#0B172B]/92 backdrop-blur-md border-b border-[#E2ECF0] dark:border-[#1E3354] shadow-[0_1px_14px_-6px_rgba(22,38,66,0.08)] dark:shadow-[0_2px_18px_-6px_rgba(2,8,20,0.6)] transition-colors no-print">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-8">
+    <header className="shrink-0 relative z-30 w-full bg-white/95 dark:bg-[#0B1322]/95 backdrop-blur-md border-b border-[#E1E8EE] dark:border-[#1B2A42] transition-colors no-print">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-4 sm:gap-8">
         {/* Zone 1: Brand Mark + Wordmark */}
         <button
           type="button"
           onClick={() => onSelectPage('home')}
-          className="inline-flex items-center gap-2.5 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] rounded-xl py-1 pr-2 transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-2.5 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E] rounded-xl py-1 pe-2 transition-opacity hover:opacity-85"
         >
           <span
             aria-hidden="true"
-            className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#0D9488] to-[#0F766E] flex items-center justify-center shadow-[0_4px_12px_-4px_rgba(13,148,136,0.55)]"
+            className="w-8 h-8 rounded-lg bg-[#0B8A7E] dark:bg-[#14B8A6] flex items-center justify-center shadow-xs"
           >
             <svg
               viewBox="0 0 24 24"
@@ -82,7 +80,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               <circle cx="11.5" cy="17.5" r="1.2" fill="currentColor" stroke="none" />
             </svg>
           </span>
-          <span className="text-[1.15rem] font-bold tracking-tight text-[#162642] dark:text-[#F1F6FA]">
+          <span className="text-[1.125rem] font-bold tracking-tight text-[#0F1D32] dark:text-[#F1F5F9]">
             BioTemp
           </span>
         </button>
@@ -90,7 +88,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         {/* Zone 2: Clean Typographic Navigation */}
         <nav
           aria-label="Navigation principale"
-          className="hidden md:flex items-center gap-8 h-full"
+          className="hidden md:flex items-center gap-7 h-full"
         >
           {topLinks.map((link) => {
             const isActive = activePage === link.id;
@@ -100,17 +98,17 @@ export const TopBar: React.FC<TopBarProps> = ({
                 type="button"
                 onClick={() => onSelectPage(link.id)}
                 aria-current={isActive ? 'page' : undefined}
-                className={`relative h-full inline-flex items-center text-sm whitespace-nowrap shrink-0 transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-[#0D9488] ${
+                className={`relative h-full inline-flex items-center text-sm whitespace-nowrap shrink-0 transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-[#0B8A7E] ${
                   isActive
-                    ? 'font-semibold text-[#162642] dark:text-[#F1F6FA]'
-                    : 'font-medium text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                    ? 'font-semibold text-[#0F1D32] dark:text-[#F1F5F9]'
+                    : 'font-medium text-[#64798F] dark:text-[#8DA2B9] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
                 }`}
               >
                 <span>{link.label}</span>
                 {isActive && (
                   <span
                     aria-hidden="true"
-                    className="absolute bottom-0 left-0 right-0 h-[2.5px] rounded-t-full bg-[#0D9488] dark:bg-[#2DD4BF]"
+                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#0B8A7E] dark:bg-[#2DD4BF]"
                   />
                 )}
               </button>
@@ -118,57 +116,66 @@ export const TopBar: React.FC<TopBarProps> = ({
           })}
         </nav>
 
-        {/* Zone 3: Quick-Guide Pro-Tips, Mode Nuit + Settings & Primary Clinical Action */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Zone 3: Quick-Guide Pro-Tips & Night Mode */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={onOpenProTips}
-            aria-label={`Ouvrir le guide rapide et les conseils (${proTipsCount} suggestions)`}
-            className={`relative inline-flex items-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 py-2 text-xs font-semibold rounded-xl border transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+            aria-label={
+              language === 'ar'
+                ? `فتح الدليل السريع والنصائح (${proTipsCount})`
+                : `Ouvrir le guide rapide et les conseils (${proTipsCount} suggestions)`
+            }
+            className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E] ${
               hasUrgentTip
-                ? 'bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3] hover:bg-[#FFE4E6] dark:bg-[#2F1320] dark:text-[#FDA4AF] dark:border-[#881337] dark:hover:bg-[#3F1A2B]'
-                : 'bg-[#F0FDFA] text-[#0F766E] border-[#CCFBF1] hover:bg-[#DDF7F3] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59] dark:hover:bg-[#133A3B]'
+                ? 'bg-[#FEF1F3] text-[#BE123C] border-[#FCCAD3] hover:bg-[#FDE2E7] dark:bg-[#2A0E17] dark:text-[#FDA4AF] dark:border-[#881337] dark:hover:bg-[#3A1420]'
+                : 'bg-[#F8FAFC] text-[#0F1D32] border-[#E1E8EE] hover:bg-[#EEF3F6] dark:bg-[#132036] dark:text-[#E2ECF5] dark:border-[#1E304D] dark:hover:bg-[#192A46]'
             }`}
           >
-            <Lightbulb className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <Lightbulb
+              className={`w-4 h-4 shrink-0 ${
+                hasUrgentTip ? 'text-[#D91E43] dark:text-[#FDA4AF]' : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
+              }`}
+              aria-hidden="true"
+            />
             <span className="hidden sm:inline">{t.proTips}</span>
             {proTipsCount > 0 && (
               <span
-                className={`min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${
+                className={`font-mono text-[11px] font-bold tabular-nums ${
                   hasUrgentTip
-                    ? 'bg-[#E11D48] text-white'
-                    : 'bg-[#0D9488] text-white'
+                    ? 'text-[#D91E43] dark:text-[#FDA4AF]'
+                    : 'text-[#0B8A7E] dark:text-[#2DD4BF]'
                 }`}
               >
-                {proTipsCount}
+                ({proTipsCount})
               </span>
             )}
           </button>
 
-          {/* Mode Nuit Toggle + Auto Settings Trigger */}
-          <div className="inline-flex items-center rounded-xl border border-[#DCE7EC] dark:border-[#26426E] overflow-hidden shrink-0">
+          {/* Night Mode Toggle + Auto Schedule Trigger */}
+          <div className="inline-flex items-center rounded-lg border border-[#E1E8EE] dark:border-[#1E304D] overflow-hidden shrink-0 bg-[#F8FAFC] dark:bg-[#132036]">
             <button
               type="button"
               onClick={onToggleDarkMode}
               aria-pressed={isDarkMode}
               aria-label={isDarkMode ? t.dayMode : t.nightMode}
-              className={`inline-flex items-center gap-1.5 min-h-[38px] px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+              className={`inline-flex items-center gap-1.5 min-h-[36px] px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E] ${
                 isDarkMode
-                  ? 'bg-[#162A4B] text-[#5EEAD4] hover:bg-[#1C355E]'
-                  : 'bg-[#F3F7F9] text-[#162642] hover:bg-[#E4EDF2]'
+                  ? 'text-[#E2ECF5] hover:bg-[#192A46]'
+                  : 'text-[#0F1D32] hover:bg-[#EEF3F6]'
               }`}
             >
               {isDarkMode ? (
-                <Sun className="w-4 h-4 shrink-0 text-[#FCD34D]" aria-hidden="true" />
+                <Sun className="w-4 h-4 shrink-0 text-[#FBBF24]" aria-hidden="true" />
               ) : (
-                <Moon className="w-4 h-4 shrink-0 text-[#162642]" aria-hidden="true" />
+                <Moon className="w-4 h-4 shrink-0 text-[#475B70]" aria-hidden="true" />
               )}
               <span className="hidden sm:inline">
                 {isDarkMode ? t.dayMode : t.nightMode}
               </span>
               {nightModePolicy !== 'manual' && (
-                <span className="hidden md:inline px-1.5 py-0.5 rounded-md bg-[#0D9488]/15 text-[#0F766E] dark:bg-[#2DD4BF]/20 dark:text-[#5EEAD4] text-[10px] font-bold">
-                  {t.autoBadge}
+                <span className="hidden md:inline font-mono text-[10px] font-bold text-[#0B8A7E] dark:text-[#2DD4BF]">
+                  · {t.autoBadge}
                 </span>
               )}
             </button>
@@ -177,36 +184,32 @@ export const TopBar: React.FC<TopBarProps> = ({
               type="button"
               onClick={() => setIsSettingsOpen((v) => !v)}
               aria-expanded={isSettingsOpen}
-              aria-label="Paramètres automatiques du Mode Nuit"
-              title="Paramètres Mode Nuit automatique (soleil ou horaire enfant)"
-              className={`min-h-[38px] px-2 sm:px-2.5 flex items-center justify-center border-l border-[#DCE7EC] dark:border-[#26426E] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+              aria-label={
+                language === 'ar'
+                  ? 'إعدادات الوضع الليلي التلقائي'
+                  : 'Paramètres automatiques du Mode Nuit'
+              }
+              title={
+                language === 'ar'
+                  ? 'إعدادات الوضع الليلي التلقائي'
+                  : 'Paramètres Mode Nuit automatique (soleil ou horaire enfant)'
+              }
+              className={`min-h-[36px] px-2 sm:px-2.5 flex items-center justify-center border-s border-[#E1E8EE] dark:border-[#1E304D] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B8A7E] ${
                 isSettingsOpen
-                  ? 'bg-[#0D9488] text-white'
+                  ? 'bg-[#0B8A7E] text-white'
                   : isDarkMode
-                  ? 'bg-[#132542] text-[#8BA3BC] hover:text-[#F1F6FA] hover:bg-[#1C355E]'
-                  : 'bg-white text-[#647B8C] hover:text-[#162642] hover:bg-[#E4EDF2]'
+                  ? 'text-[#8DA2B9] hover:text-[#F1F5F9] hover:bg-[#192A46]'
+                  : 'text-[#64798F] hover:text-[#0F1D32] hover:bg-[#EEF3F6]'
               }`}
             >
               <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
-
-          <button
-            type="button"
-            onClick={onOpenReport}
-            className="inline-flex items-center gap-2 min-h-[40px] px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] active:scale-[0.99] rounded-xl shadow-[0_6px_16px_-6px_rgba(22,38,66,0.45)] dark:shadow-[0_6px_18px_-6px_rgba(13,148,136,0.45)] transition-all whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0B172B]"
-          >
-            <FileText
-              className="w-4 h-4 shrink-0 text-[#5EEAD4] dark:text-white"
-              aria-hidden="true"
-            />
-            <span className="hidden sm:inline">{t.doctorPreview}</span>
-            <span className="sm:hidden">{t.doctorShort}</span>
-          </button>
         </div>
       </div>
 
       <TopBarSettingsPopover
+        language={language}
         isOpen={isSettingsOpen}
         isDarkMode={isDarkMode}
         nightModePolicy={nightModePolicy}

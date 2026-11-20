@@ -13,6 +13,7 @@ import {
   BellOff,
   Bluetooth,
   BluetoothOff,
+  Check,
   CheckCircle2,
   ChevronDown,
   Clock,
@@ -121,12 +122,20 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
   const [showDemoTools, setShowDemoTools] = useState(false);
   const [showRefInput, setShowRefInput] = useState(false);
   const [refInputValue, setRefInputValue] = useState('');
+  const [quickFeedback, setQuickFeedback] = useState<string | null>(null);
+
   const isStandby = profile.connectionMode === 'standby_removed';
   const isOutOfRange = profile.connectionMode === 'out_of_range';
   const isRelayed = profile.connectionMode === 'home_hub_relayed';
   const latestReading = profile.readings[profile.readings.length - 1];
   const currentTemp = latestReading ? latestReading.value : 37.0;
   const signalQuality = evaluateSignalContactQuality(profile, language);
+
+  const logQuickAction = (category: NotePresetCategory, text: string, feedbackLabel: string) => {
+    onQuickNote(category, text);
+    setQuickFeedback(feedbackLabel);
+    setTimeout(() => setQuickFeedback(null), 2200);
+  };
 
   const openReferenceInput = () => {
     setRefInputValue(String(convertTemp(currentTemp, tempUnit)));
@@ -151,6 +160,8 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
       refC
     );
     setShowRefInput(false);
+    setQuickFeedback(language === 'ar' ? 'تم الحفظ' : 'Mesure enregistrée');
+    setTimeout(() => setQuickFeedback(null), 2200);
   };
 
   const tempSpring = useSpring(currentTemp, {
@@ -229,69 +240,67 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
     <section
       id="surveillance"
       aria-label="Moniteur thermique principal"
-      className="biotemp-card p-5 sm:p-6 flex flex-col justify-between gap-4 transition-colors duration-300"
+      className="biotemp-card p-5 sm:p-6 flex flex-col justify-between gap-4 transition-colors duration-200"
     >
       {/* Card Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC] flex items-center gap-1.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-[#64798F] dark:text-[#8DA2B9]">
             {!isStandby && (
               <span
-                className="w-2 h-2 rounded-full bg-[#0D9488] dark:bg-[#2DD4BF] animate-pulse"
+                className="w-2 h-2 rounded-full bg-[#0B8A7E] dark:bg-[#2DD4BF] animate-pulse shrink-0"
                 aria-hidden="true"
               />
             )}
             <span>{isStandby ? t.standbySession : t.liveMonitoring}</span>
-          </p>
-          <h2 className="text-lg font-bold text-[#162642] dark:text-[#F1F6FA]">
-            {profile.name}
-          </h2>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onToggleAlerts}
-            title={
-              notificationPermission === 'granted' && alertsEnabled
-                ? 'Notifications système actives'
-                : 'Activer les notifications système'
-            }
-            className={`min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-full border transition-colors duration-300 cursor-pointer ${
-              alertsEnabled
-                ? 'bg-[#F0FDFA] text-[#0F766E] border-[#99F6E4] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59]'
-                : 'bg-[#F3F7F9] text-[#647B8C] border-[#DCE7EC] dark:bg-[#162947] dark:text-[#8BA3BC] dark:border-[#243E63]'
-            }`}
-          >
-            {alertsEnabled ? (
-              <Bell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            ) : (
-              <BellOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            )}
-            <span>{alertsEnabled ? t.alertsOn : t.alertsOff}</span>
-          </button>
-
-          <div className="text-right tabular-nums">
-            <p className="font-mono text-xs font-semibold text-[#0D9488] dark:text-[#5EEAD4]">
+            <span aria-hidden="true">·</span>
+            <span className="font-mono font-semibold text-[#0B8A7E] dark:text-[#2DD4BF]">
               {profile.deviceId}
-            </p>
-            <p className="text-xs text-[#647B8C] dark:text-[#8BA3BC] transition-opacity duration-300">
+            </span>
+          </div>
+          <div className="mt-0.5 flex items-baseline gap-2.5 flex-wrap">
+            <h2 className="text-xl font-bold text-[#0F1D32] dark:text-[#F1F5F9] tracking-tight">
+              {profile.name}
+            </h2>
+            <span className="text-xs font-mono text-[#64798F] dark:text-[#8DA2B9] tabular-nums">
               {latestReading ? formatTimeFr(latestReading.timestamp, language) : '—'} ·{' '}
               {trend.label}
-            </p>
+            </span>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={onToggleAlerts}
+          title={
+            notificationPermission === 'granted' && alertsEnabled
+              ? 'Notifications système actives'
+              : 'Activer les notifications système'
+          }
+          className={`min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors duration-200 cursor-pointer shrink-0 ${
+            alertsEnabled
+              ? 'bg-[#EDF9F7] text-[#087066] border-[#BEEAE4] hover:bg-[#DFF3F0] dark:bg-[#0A2624] dark:text-[#5EEAD4] dark:border-[#134E4A]'
+              : 'bg-[#F8FAFC] text-[#64798F] border-[#E1E8EE] hover:bg-[#EFF4F8] dark:bg-[#132036] dark:text-[#8DA2B9] dark:border-[#1E304D]'
+          }`}
+        >
+          {alertsEnabled ? (
+            <Bell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <BellOff className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          )}
+          <span>{alertsEnabled ? t.alertsOn : t.alertsOff}</span>
+        </button>
       </div>
 
-      {/* Silent volume note (only when sound off AND priority override off) */}
+      {/* Silent volume note */}
       <AnimatePresence initial={false}>
         {!isStandby && !soundEnabled && !overrideSilentMode && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.25 }}
-            className="px-3 py-2 rounded-2xl bg-[#F3F7F9] border border-[#DCE7EC] dark:bg-[#132544] dark:border-[#243E63] flex items-center gap-2 text-[11px] text-[#476074] dark:text-[#94ACC4]"
+            transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
+            className="px-3 py-2 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] flex items-center gap-2 text-[11px] text-[#475B70] dark:text-[#9DB0C6]"
           >
             <VolumeX className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             <span>{t.soundOffBanner}</span>
@@ -301,10 +310,15 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
 
       {/* Newborn (< 3 months) calm guidance notice */}
       {profile.ageCategory === 'newborn' && (
-        <div className="px-3.5 py-2.5 rounded-2xl bg-[#EFF6FF] border border-[#BFDBFE] dark:bg-[#132544] dark:border-[#1E40AF] flex items-start gap-2.5 text-xs text-[#1E3A8A] dark:text-[#BFDBFE]">
+        <div className="px-3.5 py-2.5 rounded-xl bg-[#EEF5FF] border border-[#C7DDFF] dark:bg-[#0F203B] dark:border-[#1E3A6E] flex items-start gap-2.5 text-xs text-[#1E3A8A] dark:text-[#BFDBFE]">
           <Baby className="w-4 h-4 shrink-0 mt-0.5 text-[#2563EB] dark:text-[#60A5FA]" aria-hidden="true" />
           <div>
-            <p className="font-bold">{t.newbornAdvisoryTitle}</p>
+            <p className="font-bold">
+              {t.newbornAdvisoryTitle} ·{' '}
+              <span className="font-mono">
+                {formatTempFr(37.8, tempUnit, language)} {unitLabel}
+              </span>
+            </p>
             <p className="text-[11px] leading-relaxed mt-0.5 opacity-95">
               {t.newbornAdvisoryBody}
             </p>
@@ -312,29 +326,32 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
         </div>
       )}
 
-      {/* Calm Status-First Banner above the Gauge */}
+      {/* Calm Status-First Clinical Banner */}
       <div
-        className={`px-3.5 py-2.5 rounded-2xl border text-center transition-colors duration-500 ${
+        className={`px-3.5 py-2.5 rounded-xl border text-center transition-colors duration-300 ${
           isStandby
-            ? 'bg-[#F3F7F9] border-[#DCE7EC] dark:bg-[#132544] dark:border-[#243E63]'
+            ? 'bg-[#F8FAFC] border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42]'
             : `${statusMeta.surfaceClass} ${statusMeta.borderClass}`
         }`}
       >
         <div
-          className={`inline-flex items-center justify-center gap-1.5 text-sm font-bold transition-colors duration-500 ${
-            isStandby ? 'text-[#647B8C] dark:text-[#8BA3BC]' : statusMeta.textClass
+          className={`inline-flex items-center justify-center gap-1.5 text-sm font-bold transition-colors duration-300 ${
+            isStandby ? 'text-[#64798F] dark:text-[#8DA2B9]' : statusMeta.textClass
           }`}
         >
           <StatusIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span>{isStandby ? t.standbyTitle : statusMeta.label}</span>
         </div>
-        <p className="text-xs text-[#476074] dark:text-[#B0C4D8] mt-0.5 transition-colors duration-300">
+        <p className="text-xs text-[#475B70] dark:text-[#9DB0C6] mt-0.5">
           {isStandby ? t.standbyDesc : statusMeta.description}
         </p>
       </div>
 
-      {/* Circular Radial Gauge */}
-      <div className="relative mx-auto w-[268px] h-[252px] flex items-center justify-center">
+      {/* Precision Circular Radial Gauge */}
+      <div
+        dir="ltr"
+        className="relative mx-auto w-[264px] h-[246px] flex items-center justify-center"
+      >
         <svg
           viewBox="0 0 280 264"
           className="w-full h-full overflow-visible"
@@ -344,30 +361,30 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
             <linearGradient id={`gaugeGrad-${profile.id}`} x1="0%" y1="100%" x2="100%" y2="0%">
               <stop
                 offset="0%"
-                stopColor={isStandby ? '#94A7B6' : statusMeta.accentHex}
-                style={{ transition: 'stop-color 500ms ease' }}
+                stopColor={isStandby ? '#94A3B8' : statusMeta.accentHex}
+                style={{ transition: 'stop-color 400ms ease' }}
               />
               <stop
                 offset="100%"
-                stopColor={isStandby ? '#647B8C' : statusMeta.ringEndHex}
-                style={{ transition: 'stop-color 500ms ease' }}
+                stopColor={isStandby ? '#64748B' : statusMeta.ringEndHex}
+                style={{ transition: 'stop-color 400ms ease' }}
               />
             </linearGradient>
           </defs>
 
-          {ticks.map((t, i) => (
+          {ticks.map((tick, i) => (
             <line
               key={i}
-              x1={t.inner.x}
-              y1={t.inner.y}
-              x2={t.outer.x}
-              y2={t.outer.y}
+              x1={tick.inner.x}
+              y1={tick.inner.y}
+              x2={tick.outer.x}
+              y2={tick.outer.y}
               className={
-                t.major
-                  ? 'stroke-[#B6C8D4] dark:stroke-[#3A5680]'
-                  : 'stroke-[#DCE7EC] dark:stroke-[#233B61]'
+                tick.major
+                  ? 'stroke-[#B8C7D4] dark:stroke-[#365078]'
+                  : 'stroke-[#DCE5EC] dark:stroke-[#1E304D]'
               }
-              strokeWidth={t.major ? '1.6' : '1'}
+              strokeWidth={tick.major ? '1.6' : '1'}
               strokeLinecap="round"
             />
           ))}
@@ -375,7 +392,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
           <path
             d={trackArc}
             fill="none"
-            className="stroke-[#E9F0F3] dark:stroke-[#1B3050]"
+            className="stroke-[#E8EFF4] dark:stroke-[#162338]"
             strokeWidth="12"
             strokeLinecap="round"
           />
@@ -396,29 +413,29 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 : { type: 'spring', stiffness: 180, damping: 24 }
             }
             r="4.5"
-            className="fill-white dark:fill-[#0F1E36]"
-            stroke="#E11D48"
-            strokeWidth="2"
+            className="fill-white dark:fill-[#0D1626]"
+            stroke="#D91E43"
+            strokeWidth="2.2"
           />
 
           <circle
             cx={valueTipPos.x}
             cy={valueTipPos.y}
             r="6.5"
-            className="fill-white dark:fill-[#0F1E36]"
-            stroke={isStandby ? '#647B8C' : statusMeta.ringEndHex}
+            className="fill-white dark:fill-[#0D1626]"
+            stroke={isStandby ? '#64748B' : statusMeta.ringEndHex}
             strokeWidth="3"
-            style={{ transition: 'stroke 450ms ease' }}
+            style={{ transition: 'stroke 400ms ease' }}
           />
 
-          <text x="42" y="242" className="fill-[#7B8FA1] dark:fill-[#8BA3BC] text-[10px] font-mono">
+          <text x="42" y="242" className="fill-[#7B8FA1] dark:fill-[#7B91A8] text-[10px] font-mono">
             {formatTempFr(35.5, tempUnit, language)}°
           </text>
           <text
             x="140"
             y="18"
             textAnchor="middle"
-            className="fill-[#7B8FA1] dark:fill-[#8BA3BC] text-[10px] font-mono"
+            className="fill-[#7B8FA1] dark:fill-[#7B91A8] text-[10px] font-mono"
           >
             {formatTempFr(38.0, tempUnit, language)}°
           </text>
@@ -426,28 +443,34 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
             x="236"
             y="242"
             textAnchor="end"
-            className="fill-[#7B8FA1] dark:fill-[#8BA3BC] text-[10px] font-mono"
+            className="fill-[#7B8FA1] dark:fill-[#7B91A8] text-[10px] font-mono"
           >
             {formatTempFr(40.5, tempUnit, language)}°
           </text>
         </svg>
 
-        {/* Raised Inner Dial Disc */}
+        {/* Inner Instrument Dial */}
         <motion.div
           key={latestReading?.id ?? 'empty'}
           animate={
             shouldReduceMotion || isStandby
               ? undefined
-              : { scale: [1, 1.018, 1] }
+              : { scale: [1, 1.015, 1] }
           }
-          transition={{ duration: 0.45, ease: 'easeOut' }}
-          className="biotemp-dial-disc absolute w-[158px] h-[158px] rounded-full flex flex-col items-center justify-center text-center border border-white dark:border-[#233B61] transition-colors duration-500"
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="biotemp-dial-disc absolute w-[158px] h-[158px] rounded-full flex flex-col items-center justify-center text-center border border-[#E8EFF4] dark:border-[#1E304D] transition-colors duration-300"
         >
-          <span className="text-[11px] font-medium text-[#647B8C] dark:text-[#8BA3BC]">
-            {isStandby ? (language === 'ar' ? 'آخر قياس' : 'Dernier relevé') : language === 'ar' ? 'الحرارة' : 'Température'}
+          <span className="text-[11px] font-medium text-[#64798F] dark:text-[#8DA2B9]">
+            {isStandby
+              ? language === 'ar'
+                ? 'آخر قياس'
+                : 'Dernier relevé'
+              : language === 'ar'
+              ? 'الحرارة'
+              : 'Température'}
           </span>
           <div className="mt-0.5 flex items-start justify-center">
-            <span className="font-mono text-[2.35rem] font-bold tracking-tight text-[#162642] dark:text-[#F1F6FA] tabular-nums leading-none transition-colors duration-300">
+            <span className="font-mono text-[2.35rem] font-bold tracking-tight text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums leading-none">
               {isStandby
                 ? language === 'ar'
                   ? 'سكون'
@@ -455,13 +478,13 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 : formatTempFr(displayTemp, tempUnit, language)}
             </span>
             {!isStandby && (
-              <span className="text-base font-bold text-[#162642] dark:text-[#94ACC4] ml-0.5 mt-0.5">
+              <span className="text-sm font-bold text-[#475B70] dark:text-[#9DB0C6] ms-0.5 mt-1">
                 {unitLabel}
               </span>
             )}
           </div>
-          <span className="mt-1.5 text-[11px] font-mono text-[#647B8C] dark:text-[#8BA3BC] tabular-nums">
-            {t.alertThreshold}: {formatTempFr(profile.threshold, tempUnit, language)} {unitLabel}
+          <span className="mt-1.5 text-[11px] font-mono text-[#64798F] dark:text-[#8DA2B9] tabular-nums">
+            {t.alertThreshold} · {formatTempFr(profile.threshold, tempUnit, language)} {unitLabel}
           </span>
         </motion.div>
       </div>
@@ -470,7 +493,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
         <button
           type="button"
           onClick={onResumeSession}
-          className="min-h-[44px] w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#0D9488] hover:bg-[#0F766E] rounded-full transition-colors cursor-pointer"
+          className="min-h-[44px] w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] rounded-xl transition-colors cursor-pointer"
         >
           <Play className="w-4 h-4" aria-hidden="true" />
           <span>
@@ -479,55 +502,61 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
         </button>
       ) : (
         <>
-          {/* Flanking Circular Quick Actions */}
-          <div className="flex items-center justify-between gap-2 px-2">
+          {/* Fast 1-Tap Care Actions & Threshold Stepper */}
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() =>
-                onQuickNote(
+                logQuickAction(
                   'Compresses tièdes',
-                  'Compresses tièdes appliquées pour apaiser l’inconfort.'
+                  language === 'ar'
+                    ? 'تم وضع كمادات ماء فاتر لتخفيف الانزعاج.'
+                    : 'Compresses tièdes appliquées pour apaiser l’inconfort.',
+                  t.compressTag
                 )
               }
-              className="group flex flex-col items-center gap-1.5 cursor-pointer focus-visible:outline-none"
+              className="min-h-[60px] px-2 py-2 rounded-xl bg-[#F8FAFC] hover:bg-[#EEF6FB] border border-[#E1E8EE] hover:border-[#BAE6FD] dark:bg-[#09111E] dark:hover:bg-[#112238] dark:border-[#1B2A42] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span className="w-12 h-12 rounded-full bg-[#EFF8FB] group-hover:bg-[#DFF1F7] border border-[#D4EBF2] dark:bg-[#132C46] dark:group-hover:bg-[#1A3B5E] dark:border-[#23486E] flex items-center justify-center text-[#0284C7] dark:text-[#38BDF8] transition-colors shadow-xs">
-                <Snowflake className="w-5 h-5" aria-hidden="true" />
-              </span>
-              <span className="text-[11px] font-medium text-[#476074] dark:text-[#B0C4D8] whitespace-nowrap">
+              <Snowflake className="w-4 h-4 text-[#0284C7] dark:text-[#38BDF8]" aria-hidden="true" />
+              <span className="text-[11px] font-semibold text-[#0F1D32] dark:text-[#E2ECF5] text-center leading-tight">
                 {t.compressTag}
               </span>
             </button>
 
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[11px] font-medium text-[#647B8C] dark:text-[#8BA3BC]">
+            <div
+              title={`${formatTempFr(37.2, tempUnit, language)} – ${formatTempFr(40.0, tempUnit, language)} ${unitLabel}`}
+              className="min-h-[60px] px-2 py-1.5 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] flex flex-col items-center justify-center gap-1"
+            >
+              <span className="text-[10px] font-medium text-[#64798F] dark:text-[#8DA2B9] text-center leading-tight">
                 {t.alertThreshold}
               </span>
-              <div className="inline-flex items-center bg-[#F3F7F9] border border-[#E2ECF0] dark:bg-[#162947] dark:border-[#243E63] rounded-full p-0.5">
+              <div dir="ltr" className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => onAdjustThreshold(-0.1)}
+                  disabled={profile.threshold <= 37.2}
                   aria-label={
                     language === 'ar'
                       ? 'خفض عتبة التنبيه'
                       : `Diminuer le seuil d'alerte (${unitLabel})`
                   }
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-[#162642] dark:text-[#F1F6FA] hover:bg-white dark:hover:bg-[#1F375E] transition-colors cursor-pointer"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-[#132036] border border-[#E1E8EE] dark:border-[#1E304D] text-[#0F1D32] dark:text-[#F1F5F9] hover:border-[#0B8A7E] disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Minus className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
-                <span className="px-2 font-mono text-xs font-bold text-[#162642] dark:text-[#F1F6FA] tabular-nums">
+                <span className="px-1 font-mono text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
                   {formatTempFr(profile.threshold, tempUnit, language)}°
                 </span>
                 <button
                   type="button"
                   onClick={() => onAdjustThreshold(0.1)}
+                  disabled={profile.threshold >= 40.0}
                   aria-label={
                     language === 'ar'
                       ? 'رفع عتبة التنبيه'
                       : `Augmenter le seuil d'alerte (${unitLabel})`
                   }
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-[#162642] dark:text-[#F1F6FA] hover:bg-white dark:hover:bg-[#1F375E] transition-colors cursor-pointer"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white dark:bg-[#132036] border border-[#E1E8EE] dark:border-[#1E304D] text-[#0F1D32] dark:text-[#F1F5F9] hover:border-[#0B8A7E] disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed"
                 >
                   <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
@@ -537,23 +566,39 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
             <button
               type="button"
               onClick={() =>
-                onQuickNote(
+                logQuickAction(
                   'Antipyrétique administré',
                   language === 'ar'
                     ? 'أُعطي خافض حرارة وفق الجرعة المناسبة.'
-                    : 'Antipyrétique administré selon la posologie adaptée.'
+                    : 'Antipyrétique administré selon la posologie adaptée.',
+                  t.antipyreticTag
                 )
               }
-              className="group flex flex-col items-center gap-1.5 cursor-pointer focus-visible:outline-none"
+              className="min-h-[60px] px-2 py-2 rounded-xl bg-[#F8FAFC] hover:bg-[#FFF5F2] border border-[#E1E8EE] hover:border-[#FED7AA] dark:bg-[#09111E] dark:hover:bg-[#241612] dark:border-[#1B2A42] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
             >
-              <span className="w-12 h-12 rounded-full bg-[#FFF3F0] group-hover:bg-[#FFE6E0] border border-[#FCD9D0] dark:bg-[#311E1B] dark:group-hover:bg-[#3E2521] dark:border-[#6B332A] flex items-center justify-center text-[#EA580C] dark:text-[#FB923C] transition-colors shadow-xs">
-                <Pill className="w-5 h-5" aria-hidden="true" />
-              </span>
-              <span className="text-[11px] font-medium text-[#476074] dark:text-[#B0C4D8] whitespace-nowrap">
+              <Pill className="w-4 h-4 text-[#D97706] dark:text-[#FB923C]" aria-hidden="true" />
+              <span className="text-[11px] font-semibold text-[#0F1D32] dark:text-[#E2ECF5] text-center leading-tight">
                 {t.antipyreticTag}
               </span>
             </button>
           </div>
+
+          {/* Instant Action Feedback */}
+          <AnimatePresence initial={false}>
+            {quickFeedback && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="px-3 py-1.5 rounded-lg bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] text-xs font-semibold text-[#087066] dark:text-[#5EEAD4] flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>
+                  {quickFeedback} · {language === 'ar' ? 'أُضيف إلى السجل' : 'ajouté au journal'}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence initial={false}>
             {persistence.phase === 'confirmed_alert' && (
@@ -562,8 +607,8 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: shouldReduceMotion ? 0 : 0.25 }}
-                className="px-3.5 py-2.5 rounded-2xl bg-[#FFF1F2] border border-[#FECDD3] dark:bg-[#2F1320] dark:border-[#881337] text-xs text-[#9F1239] dark:text-[#FDA4AF] space-y-2"
+                transition={{ duration: shouldReduceMotion ? 0 : 0.2 }}
+                className="px-3.5 py-2.5 rounded-xl bg-[#FEF1F3] border border-[#FCCAD3] dark:bg-[#2A0E17] dark:border-[#881337] text-xs text-[#9F1239] dark:text-[#FDA4AF] space-y-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-semibold">{statusMeta.label}</span>
@@ -571,7 +616,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                     <button
                       type="button"
                       onClick={openReferenceInput}
-                      className="min-h-[30px] inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white text-[#162642] border border-[#FECDD3] hover:bg-[#FFF5F6] dark:bg-[#1E0D15] dark:text-[#FDE68A] dark:border-[#881337] text-[11px] font-semibold cursor-pointer"
+                      className="min-h-[32px] inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white text-[#0F1D32] border border-[#FCCAD3] hover:bg-[#FFF5F6] dark:bg-[#190910] dark:text-[#FDE68A] dark:border-[#881337] text-[11px] font-semibold cursor-pointer"
                     >
                       <Thermometer className="w-3 h-3" aria-hidden="true" />
                       <span>
@@ -581,14 +626,15 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                     <button
                       type="button"
                       onClick={() =>
-                        onQuickNote(
+                        logQuickAction(
                           'Antipyrétique administré',
                           language === 'ar'
                             ? 'أُعطي خافض حرارة وفق الجرعة المناسبة.'
-                            : 'Note rapide suite à une hausse continue.'
+                            : 'Note rapide suite à une hausse continue.',
+                          t.oneStepNoteBtn
                         )
                       }
-                      className="min-h-[30px] px-2.5 py-1 rounded-full bg-white text-[#9F1239] border border-[#FECDD3] hover:bg-[#FFE4E6] dark:bg-[#1E0D15] dark:text-[#FDA4AF] dark:border-[#881337] text-[11px] font-semibold cursor-pointer"
+                      className="min-h-[32px] px-2.5 py-1 rounded-lg bg-white text-[#9F1239] border border-[#FCCAD3] hover:bg-[#FDE2E7] dark:bg-[#190910] dark:text-[#FDA4AF] dark:border-[#881337] text-[11px] font-semibold cursor-pointer"
                     >
                       {t.oneStepNoteBtn}
                     </button>
@@ -596,7 +642,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                       <button
                         type="button"
                         onClick={onOpenHistoryPage}
-                        className="min-h-[30px] px-2.5 py-1 rounded-full bg-[#E11D48] text-white hover:bg-[#BE123C] text-[11px] font-semibold cursor-pointer"
+                        className="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#D91E43] text-white hover:bg-[#BE123C] text-[11px] font-semibold cursor-pointer"
                       >
                         {t.oneStepChartBtn}
                       </button>
@@ -607,7 +653,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 {showRefInput && (
                   <form
                     onSubmit={handleSaveReferenceReading}
-                    className="pt-2 border-t border-[#FECDD3] dark:border-[#881337] flex flex-wrap items-center gap-2"
+                    className="pt-2 border-t border-[#FCCAD3] dark:border-[#881337] flex flex-wrap items-center gap-2"
                   >
                     <label
                       htmlFor={`ref-temp-${profile.id}`}
@@ -623,19 +669,19 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                       max={tempUnit === 'F' ? 110 : 43}
                       value={refInputValue}
                       onChange={(e) => setRefInputValue(e.target.value)}
-                      className="w-24 min-h-[32px] px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-white text-[#162642] border border-[#FECDD3] dark:bg-[#132544] dark:text-[#F1F6FA] dark:border-[#881337]"
+                      className="w-24 min-h-[34px] px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-white text-[#0F1D32] border border-[#FCCAD3] dark:bg-[#0D1626] dark:text-[#F1F5F9] dark:border-[#881337]"
                       required
                     />
                     <button
                       type="submit"
-                      className="min-h-[32px] px-3 py-1 rounded-full bg-[#162642] text-white dark:bg-[#0D9488] text-[11px] font-semibold cursor-pointer"
+                      className="min-h-[34px] px-3 py-1 rounded-lg bg-[#0F1D32] text-white dark:bg-[#0B8A7E] text-[11px] font-semibold cursor-pointer"
                     >
                       {t.refTempSaveBtn}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowRefInput(false)}
-                      className="min-h-[32px] px-2 text-[11px] font-medium text-[#881337] dark:text-[#FDA4AF] cursor-pointer"
+                      className="min-h-[34px] px-2 text-[11px] font-medium text-[#881337] dark:text-[#FDA4AF] cursor-pointer"
                     >
                       {t.refTempCancelBtn}
                     </button>
@@ -649,22 +695,22 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
             <button
               type="button"
               onClick={onOpenDevicePage}
-              className="w-full px-3 py-2 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] dark:bg-[#2C1F12] dark:border-[#78350F] text-start text-[11px] text-[#92400E] dark:text-[#FCD34D] cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl bg-[#FEF7EC] border border-[#FCDCA8] dark:bg-[#261909] dark:border-[#78350F] text-start text-[11px] text-[#92400E] dark:text-[#FCD34D] cursor-pointer"
             >
               <strong>{signalQuality.label} :</strong> {signalQuality.detail}
             </button>
           )}
 
           {/* Compact Sensor Link + Collapsible Demo Controls */}
-          <div className="pt-3 border-t border-[#EDF3F5] dark:border-[#1E3354] space-y-2.5">
+          <div className="pt-3 border-t border-[#E1E8EE] dark:border-[#1B2A42] space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <button
                 type="button"
                 onClick={onOpenDevicePage}
                 className={`inline-flex items-center gap-1.5 font-medium transition-colors cursor-pointer ${
                   isOutOfRange
-                    ? 'text-[#EA580C] dark:text-[#FDBA74]'
-                    : 'text-[#526675] hover:text-[#0D9488] dark:text-[#94ACC4] dark:hover:text-[#5EEAD4]'
+                    ? 'text-[#C26B08] dark:text-[#FCD34D]'
+                    : 'text-[#475B70] hover:text-[#0B8A7E] dark:text-[#9DB0C6] dark:hover:text-[#2DD4BF]'
                 }`}
               >
                 {isOutOfRange ? (
@@ -672,7 +718,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 ) : isRelayed ? (
                   <Router className="w-3.5 h-3.5 shrink-0 text-[#2563EB]" aria-hidden="true" />
                 ) : (
-                  <Bluetooth className="w-3.5 h-3.5 shrink-0 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+                  <Bluetooth className="w-3.5 h-3.5 shrink-0 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
                 )}
                 <span>
                   {isOutOfRange
@@ -688,7 +734,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 type="button"
                 onClick={() => setShowDemoTools((v) => !v)}
                 aria-expanded={showDemoTools}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#647B8C] hover:text-[#162642] dark:text-[#8BA3BC] dark:hover:text-[#F1F6FA] cursor-pointer"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#64798F] hover:text-[#0F1D32] dark:text-[#8DA2B9] dark:hover:text-[#F1F5F9] cursor-pointer"
               >
                 <span>{t.demoToolsToggle}</span>
                 <ChevronDown
@@ -703,7 +749,7 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 <button
                   type="button"
                   onClick={onTriggerInstantReading}
-                  className="min-h-[36px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] dark:text-[#5EEAD4] dark:bg-[#0D2B2C] dark:hover:bg-[#12383A] rounded-full transition-colors whitespace-nowrap cursor-pointer"
+                  className="min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#DFF3F0] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:border-[#134E4A] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
                 >
                   <Thermometer className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                   <span>{t.instantReading}</span>
@@ -711,21 +757,21 @@ export const PrimaryTempCard: React.FC<PrimaryTempCardProps> = ({
                 <button
                   type="button"
                   onClick={onSimulateFeverSpike}
-                  className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-[#E11D48] bg-[#FFF1F2] hover:bg-[#FFE4E6] dark:text-[#FDA4AF] dark:bg-[#2F1320] dark:hover:bg-[#3F1A2B] rounded-full transition-colors whitespace-nowrap cursor-pointer"
+                  className="min-h-[34px] px-3 py-1.5 text-xs font-semibold text-[#BE123C] bg-[#FEF1F3] hover:bg-[#FDE2E7] border border-[#FCCAD3] dark:text-[#FDA4AF] dark:bg-[#2A0E17] dark:border-[#881337] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
                 >
                   {t.simulateFever}
                 </button>
                 <button
                   type="button"
                   onClick={onSimulateNormalReturn}
-                  className="min-h-[36px] px-3 py-1.5 text-xs font-semibold text-[#334E68] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors whitespace-nowrap cursor-pointer"
+                  className="min-h-[34px] px-3 py-1.5 text-xs font-semibold text-[#475B70] bg-[#F8FAFC] hover:bg-[#EFF4F8] border border-[#E1E8EE] dark:text-[#E2ECF5] dark:bg-[#132036] dark:border-[#1E304D] rounded-lg transition-colors whitespace-nowrap cursor-pointer"
                 >
                   {t.normalReturn}
                 </button>
               </div>
             )}
 
-            <p className="text-[11px] text-[#647B8C] dark:text-[#8BA3BC] text-center leading-relaxed pt-1">
+            <p className="text-[11px] text-[#64798F] dark:text-[#7B91A8] text-center leading-relaxed">
               {t.calibrationNote}
             </p>
           </div>

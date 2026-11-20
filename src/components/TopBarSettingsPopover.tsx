@@ -11,10 +11,12 @@ import {
   Sunset,
   X,
 } from 'lucide-react';
-import { ChildProfile } from '../types/biotemp';
+import { AppLanguage, ChildProfile } from '../types/biotemp';
+import { getStrings } from '../utils/i18n';
 import { NightModePolicy, SleepSchedule } from '../utils/nightMode';
 
 interface TopBarSettingsPopoverProps {
+  language: AppLanguage;
   isOpen: boolean;
   isDarkMode: boolean;
   nightModePolicy: NightModePolicy;
@@ -30,6 +32,7 @@ interface TopBarSettingsPopoverProps {
 }
 
 export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
+  language,
   isOpen,
   isDarkMode,
   nightModePolicy,
@@ -43,6 +46,8 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
   onUpdateSleepSchedule,
   onToggleSimulateNightTime,
 }) => {
+  const s = getStrings(language).settings;
+  const demoLabel = getStrings(language).primaryCard.demoToolsToggle;
   const shouldReduceMotion = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
   const [editingProfileId, setEditingProfileId] = useState(activeProfile.id);
@@ -72,20 +77,26 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
   }> = [
     {
       id: 'manual',
-      title: 'Manuel',
-      subtitle: 'Bascule directe Jour / Nuit depuis la barre supérieure.',
+      title: s.policyManual,
+      subtitle: s.policyManualDesc,
       icon: SlidersHorizontal,
     },
     {
       id: 'sun_schedule',
-      title: 'Heure locale (Soleil)',
-      subtitle: `Actif automatiquement du coucher (${sunSchedule.sunset}) au lever (${sunSchedule.sunrise}).`,
+      title: s.policySun,
+      subtitle:
+        language === 'ar'
+          ? `يعمل تلقائياً من الغروب (${sunSchedule.sunset}) إلى الشروق (${sunSchedule.sunrise}).`
+          : `Actif automatiquement du coucher (${sunSchedule.sunset}) au lever (${sunSchedule.sunrise}).`,
       icon: Sunset,
     },
     {
       id: 'child_sleep',
-      title: `Sommeil de ${activeProfile.name}`,
-      subtitle: `Actif de ${activeProfile.sleepSchedule.bedTime} à ${activeProfile.sleepSchedule.wakeTime} selon son rythme.`,
+      title: language === 'ar' ? `نوم ${activeProfile.name}` : `Sommeil de ${activeProfile.name}`,
+      subtitle:
+        language === 'ar'
+          ? `يعمل من ${activeProfile.sleepSchedule.bedTime} إلى ${activeProfile.sleepSchedule.wakeTime} حسب جدوله.`
+          : `Actif de ${activeProfile.sleepSchedule.bedTime} à ${activeProfile.sleepSchedule.wakeTime} selon son rythme.`,
       icon: Baby,
     },
   ];
@@ -94,7 +105,6 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Click-outside backdrop */}
           <div
             className="fixed inset-0 z-40"
             onClick={onClose}
@@ -105,17 +115,16 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
             ref={panelRef}
             role="dialog"
             aria-modal="false"
-            aria-label="Paramètres automatiques du Mode Nuit"
-            initial={shouldReduceMotion ? false : { opacity: 0, y: -8, scale: 0.98 }}
+            aria-label={s.appearanceTitle}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.18, ease: 'easeOut' }}
-            className="fixed top-16 sm:top-[72px] right-3 sm:right-6 z-50 w-[calc(100vw-24px)] sm:w-[390px] max-h-[82vh] overflow-y-auto bg-white dark:bg-[#0F1E36] border border-[#DCE6EA] dark:border-[#1E3354] rounded-3xl shadow-2xl p-4 sm:p-5 space-y-4"
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.16, ease: 'easeOut' }}
+            className="fixed top-16 sm:top-[70px] end-3 sm:end-6 z-50 w-[calc(100vw-24px)] sm:w-[390px] max-h-[82vh] overflow-y-auto bg-white dark:bg-[#0D1626] border border-[#E1E8EE] dark:border-[#1B2A42] rounded-2xl shadow-2xl p-4 sm:p-5 space-y-4"
           >
-            {/* Header */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-[#F0FDFA] border border-[#CCFBF1] dark:bg-[#0D2B2C] dark:border-[#115E59] flex items-center justify-center text-[#0D9488] dark:text-[#2DD4BF]">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-lg bg-[#EDF9F7] border border-[#BEEAE4] dark:bg-[#0A2624] dark:border-[#134E4A] flex items-center justify-center text-[#0B8A7E] dark:text-[#2DD4BF]">
                   {isDarkMode ? (
                     <Moon className="w-4 h-4" aria-hidden="true" />
                   ) : (
@@ -123,12 +132,18 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                   )}
                 </span>
                 <div>
-                  <h2 className="text-sm font-bold text-[#162642] dark:text-[#F1F6FA]">
-                    Paramètres Mode Nuit
+                  <h2 className="text-sm font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
+                    {s.appearanceTitle}
                   </h2>
-                  <p className="text-[11px] text-[#647B8C] dark:text-[#8BA3BC] tabular-nums">
-                    {simulateNightTime ? 'Heure simulée' : 'Heure locale'} :{' '}
-                    <span className="font-mono font-semibold">{currentTimeLabel}</span>
+                  <p className="text-[11px] text-[#64798F] dark:text-[#8DA2B9] tabular-nums">
+                    {simulateNightTime
+                      ? language === 'ar'
+                        ? 'توقيت محاكى'
+                        : 'Heure simulée'
+                      : language === 'ar'
+                      ? 'التوقيت المحلي'
+                      : 'Heure locale'}{' '}
+                    · <span className="font-mono font-semibold">{currentTimeLabel}</span>
                   </p>
                 </div>
               </div>
@@ -136,15 +151,14 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Fermer les paramètres"
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-[#647B8C] hover:bg-[#F3F7F9] dark:text-[#8BA3BC] dark:hover:bg-[#162947] cursor-pointer"
+                aria-label={language === 'ar' ? 'إغلاق الإعدادات' : 'Fermer les paramètres'}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#64798F] hover:bg-[#F4F7F9] dark:text-[#8DA2B9] dark:hover:bg-[#132036] cursor-pointer"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
-            {/* Policy Radio Options */}
-            <div className="space-y-2" role="radiogroup" aria-label="Déclenchement du Mode Nuit">
+            <div className="space-y-2" role="radiogroup" aria-label={s.appearanceTitle}>
               {policies.map((p) => {
                 const Icon = p.icon;
                 const active = nightModePolicy === p.id;
@@ -155,26 +169,26 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                     role="radio"
                     aria-checked={active}
                     onClick={() => onChangePolicy(p.id)}
-                    className={`w-full text-left p-3 rounded-2xl border transition-colors flex items-start gap-3 cursor-pointer ${
+                    className={`w-full text-start p-3 rounded-xl border transition-colors flex items-start gap-3 cursor-pointer ${
                       active
-                        ? 'bg-[#F0FDFA] border-[#5EEAD4] dark:bg-[#0D2B2C] dark:border-[#0D9488]'
-                        : 'bg-[#F8FAFA] border-[#E6EFF2] hover:bg-[#F1F6F8] dark:bg-[#0B172B] dark:border-[#1E3354] dark:hover:bg-[#132542]'
+                        ? 'bg-[#EDF9F7] border-[#0B8A7E]/40 dark:bg-[#0A2624] dark:border-[#14B8A6]/50'
+                        : 'bg-[#F8FAFC] border-[#E1E8EE] hover:bg-[#EFF4F8] dark:bg-[#09111E] dark:border-[#1B2A42] dark:hover:bg-[#111D33]'
                     }`}
                   >
                     <span
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
                         active
-                          ? 'bg-[#0D9488] text-white'
-                          : 'bg-white text-[#647B8C] border border-[#DCE6EA] dark:bg-[#162947] dark:text-[#8BA3BC] dark:border-[#243E63]'
+                          ? 'bg-[#0B8A7E] text-white'
+                          : 'bg-white text-[#64798F] border border-[#E1E8EE] dark:bg-[#132036] dark:text-[#8DA2B9] dark:border-[#1E304D]'
                       }`}
                     >
                       <Icon className="w-4 h-4" aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold text-[#162642] dark:text-[#F1F6FA]">
+                      <p className="text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
                         {p.title}
                       </p>
-                      <p className="text-[11px] text-[#526675] dark:text-[#94ACC4] mt-0.5 leading-relaxed">
+                      <p className="text-[11px] text-[#475B70] dark:text-[#9DB0C6] mt-0.5 leading-relaxed">
                         {p.subtitle}
                       </p>
                     </div>
@@ -183,24 +197,22 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
               })}
             </div>
 
-            {/* Local Sunrise / Sunset Preview Strip */}
-            <div className="px-3 py-2.5 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] flex items-center justify-between text-[11px] text-[#476074] dark:text-[#94ACC4] tabular-nums">
+            <div className="px-3 py-2 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] flex items-center justify-between text-[11px] text-[#475B70] dark:text-[#9DB0C6] tabular-nums">
               <span className="inline-flex items-center gap-1.5">
-                <Sunrise className="w-3.5 h-3.5 text-[#EA580C]" aria-hidden="true" />
-                Lever <strong className="font-mono">{sunSchedule.sunrise}</strong>
+                <Sunrise className="w-3.5 h-3.5 text-[#D97706]" aria-hidden="true" />
+                {s.sunriseLabel} <strong className="font-mono">{sunSchedule.sunrise}</strong>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Sunset className="w-3.5 h-3.5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
-                Coucher <strong className="font-mono">{sunSchedule.sunset}</strong>
+                <Sunset className="w-3.5 h-3.5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
+                {s.sunsetLabel} <strong className="font-mono">{sunSchedule.sunset}</strong>
               </span>
             </div>
 
-            {/* Per-Child Sleep Schedule Editor */}
-            <div className="p-3.5 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-3">
+            <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold text-[#162642] dark:text-[#F1F6FA] flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
-                  <span>Horaire de sommeil par enfant</span>
+                <span className="text-xs font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
+                  <span>{s.sleepScheduleTitle}</span>
                 </span>
               </div>
 
@@ -212,10 +224,10 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                       key={prof.id}
                       type="button"
                       onClick={() => setEditingProfileId(prof.id)}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-full border transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-colors cursor-pointer ${
                         selected
-                          ? 'bg-[#162642] text-white border-[#162642] dark:bg-[#0D9488] dark:border-[#0D9488]'
-                          : 'bg-white text-[#476074] border-[#DCE6EA] dark:bg-[#0F1E36] dark:text-[#94ACC4] dark:border-[#1E3354]'
+                          ? 'bg-[#0F1D32] text-white border-[#0F1D32] dark:bg-[#0B8A7E] dark:border-[#0B8A7E]'
+                          : 'bg-white text-[#475B70] border-[#E1E8EE] dark:bg-[#0D1626] dark:text-[#9DB0C6] dark:border-[#1B2A42]'
                       }`}
                     >
                       {prof.name}
@@ -228,9 +240,9 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                 <div>
                   <label
                     htmlFor="sleep-bedtime"
-                    className="block text-[11px] font-medium text-[#526675] dark:text-[#94ACC4] mb-1"
+                    className="block text-[11px] font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Coucher ({editingProfile.name})
+                    {s.bedTimeLabel} ({editingProfile.name})
                   </label>
                   <input
                     id="sleep-bedtime"
@@ -242,15 +254,15 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                         bedTime: e.target.value,
                       })
                     }
-                    className="w-full min-h-[38px] px-2.5 py-1.5 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-2.5 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="sleep-waketime"
-                    className="block text-[11px] font-medium text-[#526675] dark:text-[#94ACC4] mb-1"
+                    className="block text-[11px] font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Réveil ({editingProfile.name})
+                    {s.wakeTimeLabel} ({editingProfile.name})
                   </label>
                   <input
                     id="sleep-waketime"
@@ -262,22 +274,21 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                         wakeTime: e.target.value,
                       })
                     }
-                    className="w-full min-h-[38px] px-2.5 py-1.5 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-2.5 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Test / Preview Simulated Night Time (collapsed by default) */}
             {nightModePolicy !== 'manual' && (
-              <div className="pt-1 border-t border-[#EDF3F5] dark:border-[#1E3354] space-y-2">
+              <div className="pt-1 border-t border-[#E1E8EE] dark:border-[#1B2A42] space-y-2">
                 <button
                   type="button"
                   onClick={() => setShowDemoNightToggle((v) => !v)}
                   aria-expanded={showDemoNightToggle}
-                  className="w-full inline-flex items-center justify-center gap-1 py-1 text-[11px] font-semibold text-[#647B8C] hover:text-[#162642] dark:text-[#8BA3BC] dark:hover:text-[#F1F6FA] cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-1 py-1 text-[11px] font-semibold text-[#64798F] hover:text-[#0F1D32] dark:text-[#8DA2B9] dark:hover:text-[#F1F5F9] cursor-pointer"
                 >
-                  <span>Mode test / simulation</span>
+                  <span>{demoLabel}</span>
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform ${showDemoNightToggle ? 'rotate-180' : ''}`}
                     aria-hidden="true"
@@ -288,15 +299,15 @@ export const TopBarSettingsPopover: React.FC<TopBarSettingsPopoverProps> = ({
                     type="button"
                     onClick={onToggleSimulateNightTime}
                     aria-pressed={simulateNightTime}
-                    className={`w-full min-h-[38px] px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                    className={`w-full min-h-[38px] px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
                       simulateNightTime
-                        ? 'bg-[#162642] text-white border-[#162642] dark:bg-[#0D9488] dark:border-[#0D9488]'
-                        : 'bg-[#F3F7F9] text-[#162642] border-[#DCE6EA] hover:bg-[#E4EDF2] dark:bg-[#162947] dark:text-[#E2ECF5] dark:border-[#243E63]'
+                        ? 'bg-[#0F1D32] text-white border-[#0F1D32] dark:bg-[#0B8A7E] dark:border-[#0B8A7E]'
+                        : 'bg-[#F8FAFC] text-[#0F1D32] border-[#E1E8EE] hover:bg-[#EFF4F8] dark:bg-[#132036] dark:text-[#E2ECF5] dark:border-[#1E304D]'
                     }`}
                   >
-                    <span>Tester avec heure nocturne simulée (22:30)</span>
+                    <span>{s.simulateNightBtn}</span>
                     <span className="font-mono text-[11px]">
-                      {simulateNightTime ? 'Actif' : 'Inactif'}
+                      {simulateNightTime ? s.activeLabel : s.inactiveLabel}
                     </span>
                   </button>
                 )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowRightLeft,
+  CalendarCheck2,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -34,7 +35,9 @@ import {
   getRecommendedThresholdForAge,
   tempUnitLabel,
 } from '../utils/temperature';
+import { buildProfileVaccinationCalendar } from '../utils/vaccinationSchedule';
 import { AppSettingsBlock } from './AppSettingsBlock';
+import { VaccinationCalendarModal } from './VaccinationCalendarModal';
 
 interface ProfilePageProps {
   profiles: ChildProfile[];
@@ -48,10 +51,12 @@ interface ProfilePageProps {
   onCreateProfile: (payload: {
     name: string;
     ageCategory: AgeCategory;
+    birthDate?: string;
     deviceId: string;
     deviceName: string;
     threshold: number;
   }) => void;
+  onUpdateBirthDate: (profileId: string, birthDate: string) => void;
   onAddVaccination: (
     profileId: string,
     payload: {
@@ -114,34 +119,54 @@ interface ProfilePageProps {
 
 type ProfileSectionTab = 'profiles' | 'global_health' | 'settings';
 
-const VACCINE_PRESETS = [
-  'Hexavalent (DTP-Coq-Hib-HepB)',
-  'Pneumocoque (PCV)',
-  'ROR (Rougeole-Oreillons-Rubéole)',
-  'Méningocoque',
-  'Grippe saisonnière',
+const VACCINE_PRESETS: Array<{ value: string; labelAr: string }> = [
+  { value: 'Hexavalent (DTP-Coq-Hib-HepB)', labelAr: 'اللقاح السداسي (DTP-Coq-Hib-HepB)' },
+  { value: 'Pneumocoque (PCV)', labelAr: 'المكورات الرئوية (PCV)' },
+  { value: 'ROR (Rougeole-Oreillons-Rubéole)', labelAr: 'الحصبة والنكاف والحصبة الألمانية (ROR)' },
+  { value: 'Méningocoque', labelAr: 'المكورات السحائية' },
+  { value: 'Grippe saisonnière', labelAr: 'الإنفلونزا الموسمية' },
 ];
 
-const REMINDER_CATEGORIES: HealthReminderCategory[] = [
-  'Pédiatre / Médecin',
-  'Bilan / Analyses',
-  'Traitement / Vitamines',
-  'Dentaire / Ophtalmo',
-  'Autre',
+const REMINDER_CATEGORIES: Array<{ value: HealthReminderCategory; labelAr: string }> = [
+  { value: 'Pédiatre / Médecin', labelAr: 'طبيب الأطفال / الطبيب' },
+  { value: 'Bilan / Analyses', labelAr: 'فحوصات / تحاليل' },
+  { value: 'Traitement / Vitamines', labelAr: 'علاج / فيتامينات' },
+  { value: 'Dentaire / Ophtalmo', labelAr: 'أسنان / عيون' },
+  { value: 'Autre', labelAr: 'أخرى' },
 ];
 
-const REMINDER_PRESETS: Array<{ title: string; category: HealthReminderCategory }> = [
-  { title: 'Visite pédiatre de contrôle', category: 'Pédiatre / Médecin' },
-  { title: 'Vitamine D quotidienne', category: 'Traitement / Vitamines' },
-  { title: 'Contrôle dentaire annuel', category: 'Dentaire / Ophtalmo' },
-  { title: 'Bilan sanguin / analyses', category: 'Bilan / Analyses' },
+const REMINDER_PRESETS: Array<{
+  title: string;
+  titleAr: string;
+  category: HealthReminderCategory;
+}> = [
+  {
+    title: 'Visite pédiatre de contrôle',
+    titleAr: 'زيارة متابعة لدى طبيب الأطفال',
+    category: 'Pédiatre / Médecin',
+  },
+  {
+    title: 'Vitamine D quotidienne',
+    titleAr: 'فيتامين D اليومي',
+    category: 'Traitement / Vitamines',
+  },
+  {
+    title: 'Contrôle dentaire annuel',
+    titleAr: 'فحص الأسنان السنوي',
+    category: 'Dentaire / Ophtalmo',
+  },
+  {
+    title: 'Bilan sanguin / analyses',
+    titleAr: 'تحاليل الدم / الفحوصات',
+    category: 'Bilan / Analyses',
+  },
 ];
 
-function formatIsoDateFr(isoDate: string): string {
+function formatIsoDateFr(isoDate: string, lang: AppLanguage = 'fr'): string {
   if (!isoDate) return '—';
   const [y, m, d] = isoDate.split('-').map(Number);
   if (!y || !m || !d) return isoDate;
-  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', {
+  return new Date(y, m - 1, d).toLocaleDateString(lang === 'ar' ? 'ar-DZ' : 'fr-FR', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -158,6 +183,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onOpenReport,
   onReassignRecentSegment,
   onCreateProfile,
+  onUpdateBirthDate,
   onAddVaccination,
   onDeleteVaccination,
   onAddHealthReminder,
@@ -199,17 +225,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onToggleAutoConfirmIdentity,
   onResetSettings,
 }) => {
+  const isAr = language === 'ar';
   const t = getStrings(language).profilePage;
   const unitSuffix = tempUnitLabel(tempUnit);
   const [sectionTab, setSectionTab] = useState<ProfileSectionTab>('profiles');
+  const [calendarProfileId, setCalendarProfileId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState('');
   const [ageCategory, setAgeCategory] = useState<AgeCategory>('infant');
+  const [birthDateInput, setBirthDateInput] = useState('');
   const [deviceId, setDeviceId] = useState('BT-CORE-05');
   const [deviceName, setDeviceName] = useState('');
   const [threshold, setThreshold] = useState('38.0');
 
   const todayIso = new Date().toISOString().slice(0, 10);
+
+  const activeCalendarSummary = buildProfileVaccinationCalendar(activeProfile, language);
 
   // Vaccination form state
   const [vaccineName, setVaccineName] = useState('');
@@ -254,11 +285,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     onCreateProfile({
       name: cleanedName,
       ageCategory,
+      birthDate: birthDateInput || undefined,
       deviceId: cleanedDevice,
-      deviceName: deviceName.trim() || `Cœur de ${cleanedName}`,
+      deviceName:
+        deviceName.trim() || (isAr ? `وحدة ${cleanedName}` : `Cœur de ${cleanedName}`),
       threshold: Number(threshold) || 38.0,
     });
     setName('');
+    setBirthDateInput('');
     setDeviceName('');
     setShowAddForm(false);
   };
@@ -270,7 +304,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     onReassignRecentSegment(activeProfile.id, targetId);
     if (targetProfile) {
       setReassignNotice(
-        `Les mesures des 30 dernières minutes ont été transférées de ${activeProfile.name} vers ${targetProfile.name}.`
+        isAr
+          ? `تم نقل قياسات آخر 30 دقيقة من ${activeProfile.name} إلى ${targetProfile.name}.`
+          : `Les mesures des 30 dernières minutes ont été transférées de ${activeProfile.name} vers ${targetProfile.name}.`
       );
     }
   };
@@ -307,22 +343,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header + Sub-tabs */}
       <section className="biotemp-card p-5 sm:p-6 space-y-4 transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC]">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
               {t.subtitle}
             </p>
-            <h1 className="text-xl font-bold text-[#162642] dark:text-[#F1F6FA] flex items-center gap-2 mt-0.5">
+            <h1 className="text-xl font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-2 mt-0.5">
               {sectionTab === 'profiles' ? (
-                <Users className="w-5 h-5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+                <Users className="w-5 h-5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
               ) : sectionTab === 'global_health' ? (
-                <HeartPulse className="w-5 h-5 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+                <HeartPulse className="w-5 h-5 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
               ) : (
                 <SlidersHorizontal
-                  className="w-5 h-5 text-[#0D9488] dark:text-[#2DD4BF]"
+                  className="w-5 h-5 text-[#0B8A7E] dark:text-[#2DD4BF]"
                   aria-hidden="true"
                 />
               )}
@@ -334,8 +370,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   : t.tabSettingsShortcut}
               </span>
             </h1>
-            <p className="mt-1 text-xs text-[#526675] dark:text-[#94ACC4] leading-relaxed flex flex-wrap items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-[#0D9488] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
+            <p className="mt-1 text-xs text-[#475B70] dark:text-[#9DB0C6] leading-relaxed flex flex-wrap items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
               <span>
                 <strong>{t.localFirstPrefix}</strong> {t.localFirstBody}
               </span>
@@ -347,7 +383,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddForm((v) => !v)}
-                className="min-h-[42px] inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] rounded-full transition-colors cursor-pointer"
+                className="min-h-[40px] inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-[#0F1D32] hover:bg-[#1B2F4D] dark:bg-[#0B8A7E] dark:hover:bg-[#087066] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" aria-hidden="true" />
                 <span>{t.newProfile}</span>
@@ -356,8 +392,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
             <button
               type="button"
+              onClick={() => setCalendarProfileId(activeProfile.id)}
+              className="min-h-[40px] inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EDF3F7] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:hover:bg-[#122038] dark:border-[#1B2A42] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <CalendarCheck2 className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
+              <span>{t.vaccinationCalendarBtn}</span>
+              {activeCalendarSummary.autoReminders.length > 0 && (
+                <span className="min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-md text-[10px] font-mono font-bold tabular-nums bg-[#FEF7EC] text-[#B45309] border border-[#FCDCA8] dark:bg-[#451A03] dark:text-[#FDE68A] dark:border-[#78350F]">
+                  {activeCalendarSummary.autoReminders.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
               onClick={onOpenReport}
-              className="min-h-[42px] inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#0F766E] bg-[#F0FDFA] hover:bg-[#CCFBF1] border border-[#99F6E4] dark:text-[#5EEAD4] dark:bg-[#0D2B2C] dark:hover:bg-[#12383A] dark:border-[#134E4A] rounded-full transition-colors cursor-pointer"
+              className="min-h-[40px] inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#D8F2EE] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:hover:bg-[#103835] dark:border-[#134E4A] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               <FileText className="w-4 h-4" aria-hidden="true" />
               <span>{t.doctorSummary}</span>
@@ -366,21 +416,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         </div>
 
         {/* Section Tabs: Profils & Modules | Santé Globale | Paramètres */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-[#EDF3F5] dark:border-[#1E3354]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-[#E1E8EE] dark:border-[#1B2A42]">
           <div
             role="tablist"
-            aria-label="Sous-sections du profil"
-            className="inline-flex flex-wrap items-center gap-1 p-1 bg-[#F3F7F9] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-2xl self-start"
+            aria-label={isAr ? 'أقسام الملف الشخصي' : 'Sous-sections du profil'}
+            className="inline-flex flex-wrap items-center gap-1 p-1 bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-xl self-start"
           >
             <button
               type="button"
               role="tab"
               aria-selected={sectionTab === 'profiles'}
               onClick={() => setSectionTab('profiles')}
-              className={`min-h-[36px] inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer ${
+              className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 sectionTab === 'profiles'
-                  ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                  : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                  ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                  : 'text-[#64798F] dark:text-[#7B91A8] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
               }`}
             >
               <Users className="w-3.5 h-3.5" aria-hidden="true" />
@@ -392,20 +442,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               role="tab"
               aria-selected={sectionTab === 'global_health'}
               onClick={() => setSectionTab('global_health')}
-              className={`min-h-[36px] inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer ${
+              className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 sectionTab === 'global_health'
-                  ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                  : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                  ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                  : 'text-[#64798F] dark:text-[#7B91A8] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
               }`}
             >
               <HeartPulse className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{t.tabGlobalHealth}</span>
               {pendingRemindersCount > 0 && (
                 <span
-                  className={`min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${
+                  className={`min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-md text-[10px] font-mono font-bold tabular-nums ${
                     sectionTab === 'global_health'
                       ? 'bg-white/20 text-white'
-                      : 'bg-[#0D9488] text-white'
+                      : 'bg-[#0B8A7E] text-white'
                   }`}
                 >
                   {pendingRemindersCount}
@@ -418,10 +468,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               role="tab"
               aria-selected={sectionTab === 'settings'}
               onClick={() => setSectionTab('settings')}
-              className={`min-h-[36px] inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer ${
+              className={`min-h-[34px] inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 sectionTab === 'settings'
-                  ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                  : 'text-[#647B8C] dark:text-[#8BA3BC] hover:text-[#162642] dark:hover:text-[#F1F6FA]'
+                  ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                  : 'text-[#64798F] dark:text-[#7B91A8] hover:text-[#0F1D32] dark:hover:text-[#F1F5F9]'
               }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
@@ -431,7 +481,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
           {sectionTab === 'global_health' && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-medium text-[#647B8C] dark:text-[#8BA3BC] mr-1">
+              <span className="text-[11px] font-medium text-[#64798F] dark:text-[#7B91A8] me-1">
                 {t.journalFor}
               </span>
               {profiles.map((p) => {
@@ -441,10 +491,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     key={p.id}
                     type="button"
                     onClick={() => onSelectProfile(p.id)}
-                    className={`min-h-[32px] px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
+                    className={`min-h-[32px] px-3 py-1 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
                       isSelected
-                        ? 'bg-[#F0FDFA] text-[#0F766E] border-[#99F6E4] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59]'
-                        : 'bg-white text-[#476074] border-[#DCE6EA] hover:bg-[#F3F7F9] dark:bg-[#0B172B] dark:text-[#94ACC4] dark:border-[#1E3354]'
+                        ? 'bg-[#EDF9F7] text-[#087066] border-[#BEEAE4] dark:bg-[#0A2624] dark:text-[#5EEAD4] dark:border-[#134E4A]'
+                        : 'bg-white text-[#475B70] border-[#E1E8EE] hover:bg-[#F4F7F9] dark:bg-[#09111E] dark:text-[#9DB0C6] dark:border-[#1B2A42]'
                     }`}
                   >
                     {p.name}
@@ -462,36 +512,36 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             <form
               onSubmit={handleSubmit}
               className="biotemp-card p-5 sm:p-6 space-y-4 transition-colors"
-              aria-label="Créer un nouveau profil"
+              aria-label={isAr ? 'إنشاء ملف جديد' : 'Créer un nouveau profil'}
             >
-              <h2 className="text-base font-bold text-[#162642] dark:text-[#F1F6FA]">
-                Ajouter un profil enfant ou adulte
+              <h2 className="text-base font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
+                {isAr ? 'إضافة ملف طفل أو بالغ' : 'Ajouter un profil enfant ou adulte'}
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label
                     htmlFor="new-prof-name"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Prénom
+                    {isAr ? 'الاسم' : 'Prénom'}
                   </label>
                   <input
                     id="new-prof-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Ex. : Adam"
+                    placeholder={isAr ? 'مثال: آدم' : 'Ex. : Adam'}
                     required
-                    className="w-full min-h-[42px] px-3 py-2 text-sm text-[#162642] bg-[#F7FAFB] border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] dark:placeholder:text-[#6B849E] rounded-xl"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] dark:placeholder:text-[#64798F] rounded-lg"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="new-prof-age"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Tranche d&apos;âge &amp; Patch
+                    {isAr ? 'الفئة العمرية واللاصقة' : "Tranche d'âge & Patch"}
                   </label>
                   <select
                     id="new-prof-age"
@@ -501,21 +551,46 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       setAgeCategory(nextAge);
                       setThreshold(String(getRecommendedThresholdForAge(nextAge)));
                     }}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm text-[#162642] bg-[#F7FAFB] border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[40px] px-3 py-2 text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
                   >
-                    <option value="newborn">Nouveau-né (&lt; 3 mois)</option>
-                    <option value="infant">Nourrisson (3–24 mois)</option>
-                    <option value="child">Enfant (2–5 ans)</option>
-                    <option value="adult">Adulte (+5 ans)</option>
+                    <option value="newborn">
+                      {isAr ? 'حديث الولادة (< 3 أشهر)' : 'Nouveau-né (< 3 mois)'}
+                    </option>
+                    <option value="infant">
+                      {isAr ? 'رضيع (3–24 شهراً)' : 'Nourrisson (3–24 mois)'}
+                    </option>
+                    <option value="child">
+                      {isAr ? 'طفل (2–5 سنوات)' : 'Enfant (2–5 ans)'}
+                    </option>
+                    <option value="adult">
+                      {isAr ? 'بالغ (+5 سنوات)' : 'Adulte (+5 ans)'}
+                    </option>
                   </select>
                 </div>
 
                 <div>
                   <label
-                    htmlFor="new-prof-device"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    htmlFor="new-prof-birthdate"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Module BioTemp Core
+                    {isAr ? 'تاريخ الميلاد (اختياري للتذكيرات)' : 'Date de naissance (optionnel)'}
+                  </label>
+                  <input
+                    id="new-prof-birthdate"
+                    type="date"
+                    max={todayIso}
+                    value={birthDateInput}
+                    onChange={(e) => setBirthDateInput(e.target.value)}
+                    className="w-full min-h-[40px] px-3 py-2 font-mono text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="new-prof-device"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
+                  >
+                    {isAr ? 'معرّف وحدة BioTemp Core' : 'Module BioTemp Core'}
                   </label>
                   <input
                     id="new-prof-device"
@@ -524,31 +599,31 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     onChange={(e) => setDeviceId(e.target.value)}
                     placeholder="BT-CORE-05"
                     required
-                    className="w-full min-h-[42px] px-3 py-2 font-mono text-sm text-[#162642] bg-[#F7FAFB] border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[40px] px-3 py-2 font-mono text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="new-prof-devname"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Nom du module
+                    {isAr ? 'اسم الوحدة' : 'Nom du module'}
                   </label>
                   <input
                     id="new-prof-devname"
                     type="text"
                     value={deviceName}
                     onChange={(e) => setDeviceName(e.target.value)}
-                    placeholder="Ex. : Cœur d'Adam"
-                    className="w-full min-h-[42px] px-3 py-2 text-sm text-[#162642] bg-[#F7FAFB] border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] dark:placeholder:text-[#6B849E] rounded-xl"
+                    placeholder={isAr ? 'مثال: وحدة آدم' : "Ex. : Cœur d'Adam"}
+                    className="w-full min-h-[40px] px-3 py-2 text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] dark:placeholder:text-[#64798F] rounded-lg"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="new-prof-thresh"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
                     {t.alertThreshold} ({unitSuffix})
                   </label>
@@ -556,7 +631,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     id="new-prof-thresh"
                     value={threshold}
                     onChange={(e) => setThreshold(e.target.value)}
-                    className="w-full min-h-[42px] px-3 py-2 font-mono text-sm text-[#162642] bg-[#F7FAFB] border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[40px] px-3 py-2 font-mono text-sm text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
                   >
                     <option value="37.8">
                       {formatTempFr(37.8, tempUnit, language)} {unitSuffix}
@@ -578,96 +653,97 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="min-h-[40px] px-4 py-2 text-xs font-medium text-[#647B8C] dark:text-[#94ACC4] cursor-pointer"
+                  className="min-h-[38px] px-4 py-2 text-xs font-medium text-[#64798F] dark:text-[#7B91A8] cursor-pointer"
                 >
-                  Annuler
+                  {isAr ? 'إلغاء' : 'Annuler'}
                 </button>
                 <button
                   type="submit"
-                  className="min-h-[40px] px-5 py-2 text-xs font-semibold text-white bg-[#0D9488] hover:bg-[#0F766E] rounded-full cursor-pointer"
+                  className="min-h-[38px] px-5 py-2 text-xs font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] rounded-lg transition-colors cursor-pointer"
                 >
-                  Créer le profil
+                  {isAr ? 'إنشاء الملف' : 'Créer le profil'}
                 </button>
               </div>
             </form>
           )}
 
           {/* Profile Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {profiles.map((profile) => {
               const isActive = profile.id === activeProfile.id;
               const isVerified = Boolean(identityConfirmedIds[profile.id]);
               const latest = profile.readings[profile.readings.length - 1];
+              const profileVaxCal = buildProfileVaccinationCalendar(profile, language);
 
               return (
                 <article
                   key={profile.id}
                   className={`biotemp-card p-5 sm:p-6 flex flex-col justify-between gap-4 transition-all ${
-                    isActive ? 'ring-2 ring-[#0D9488] dark:ring-[#2DD4BF]' : ''
+                    isActive ? 'ring-2 ring-[#0B8A7E] dark:ring-[#2DD4BF]' : ''
                   }`}
                 >
                   <div>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${
                             isActive
-                              ? 'bg-[#162642] text-white dark:bg-[#0D9488]'
-                              : 'bg-[#F0FDFA] text-[#0D9488] border border-[#CCFBF1] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59]'
+                              ? 'bg-[#0F1D32] text-white dark:bg-[#0B8A7E]'
+                              : 'bg-[#EDF9F7] text-[#0B8A7E] border border-[#BEEAE4] dark:bg-[#0A2624] dark:text-[#5EEAD4] dark:border-[#134E4A]'
                           }`}
                         >
                           {profile.initials}
                         </div>
                         <div>
-                          <h2 className="text-base font-bold text-[#162642] dark:text-[#F1F6FA]">
+                          <h2 className="text-base font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
                             {profile.name}
                           </h2>
-                          <p className="text-xs text-[#647B8C] dark:text-[#8BA3BC]">
+                          <p className="text-xs text-[#64798F] dark:text-[#7B91A8]">
                             {profile.ageLabel}
                           </p>
                         </div>
                       </div>
 
-                      <span className="font-mono text-base font-bold text-[#162642] dark:text-[#F1F6FA] tabular-nums">
+                      <span className="font-mono text-base font-bold text-[#0F1D32] dark:text-[#F1F5F9] tabular-nums">
                         {latest
                           ? `${formatTempFr(latest.value, tempUnit, language)} ${unitSuffix}`
                           : '—'}
                       </span>
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-[#EDF3F5] dark:border-[#1E3354] space-y-2 text-xs text-[#476074] dark:text-[#94ACC4] tabular-nums">
-                      <div className="flex justify-between">
+                    <div className="mt-4 pt-4 border-t border-[#E1E8EE] dark:border-[#1B2A42] space-y-2 text-xs text-[#475B70] dark:text-[#9DB0C6] tabular-nums">
+                      <div className="flex justify-between gap-2">
                         <span>{t.namedModule}</span>
-                        <span className="font-semibold text-[#162642] dark:text-[#E2ECF5]">
+                        <span className="font-semibold text-[#0F1D32] dark:text-[#E2E8F0]">
                           {profile.deviceName}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-2">
                         <span>{t.hardwareId}</span>
-                        <span className="font-mono font-bold text-[#0D9488] dark:text-[#5EEAD4]">
+                        <span className="font-mono font-bold text-[#0B8A7E] dark:text-[#5EEAD4]">
                           {profile.deviceId}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-2">
                         <span>{t.medicalPatch}</span>
-                        <span className="font-medium text-[#162642] dark:text-[#E2ECF5]">
+                        <span className="font-medium text-[#0F1D32] dark:text-[#E2E8F0]">
                           {profile.patchLabel}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-2">
                         <span>{t.alertThreshold}</span>
-                        <span className="font-mono font-semibold text-[#162642] dark:text-[#E2ECF5]">
+                        <span className="font-mono font-semibold text-[#0F1D32] dark:text-[#E2E8F0]">
                           {formatTempFr(profile.threshold, tempUnit, language)} {unitSuffix}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-2">
                         <span>{t.recordedHistory}</span>
-                        <span className="font-mono text-[#162642] dark:text-[#E2ECF5]">
+                        <span className="font-mono text-[#0F1D32] dark:text-[#E2E8F0]">
                           {profile.readings.length} {t.readingsWord} · {profile.notes.length}{' '}
                           {t.notesWord}
                         </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-2">
                         <span>{t.globalHealthLabel}</span>
                         <button
                           type="button"
@@ -675,7 +751,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                             onSelectProfile(profile.id);
                             setSectionTab('global_health');
                           }}
-                          className="font-semibold text-[#0D9488] dark:text-[#2DD4BF] hover:underline cursor-pointer"
+                          className="font-semibold text-[#0B8A7E] dark:text-[#2DD4BF] hover:underline cursor-pointer"
                         >
                           {profile.vaccinations.length}{' '}
                           {profile.vaccinations.length > 1 ? t.vaccinesWord : t.vaccineWord} ·{' '}
@@ -693,7 +769,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <button
                         type="button"
                         onClick={() => onConfirmIdentity(profile.id)}
-                        className="min-h-[40px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#9A3412] bg-[#FFF7ED] hover:bg-[#FFEDD5] border border-[#FED7AA] dark:text-[#FDBA74] dark:bg-[#2C1C12] dark:hover:bg-[#3A2416] dark:border-[#7C2D12] rounded-full transition-colors cursor-pointer"
+                        className="min-h-[38px] w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#B45309] bg-[#FEF7EC] hover:bg-[#FDECD2] border border-[#FCDCA8] dark:text-[#FDE68A] dark:bg-[#261909] dark:hover:bg-[#36230D] dark:border-[#78350F] rounded-lg transition-colors cursor-pointer"
                       >
                         <UserCheck className="w-3.5 h-3.5" aria-hidden="true" />
                         <span>
@@ -701,7 +777,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         </span>
                       </button>
                     ) : (
-                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-[#0D9488] dark:text-[#2DD4BF] py-1">
+                      <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-[#0B8A7E] dark:text-[#2DD4BF] py-1">
                         <ShieldCheck className="w-4 h-4" aria-hidden="true" />
                         <span>{t.identityVerified}</span>
                       </div>
@@ -711,10 +787,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       <button
                         type="button"
                         onClick={() => onSelectProfile(profile.id)}
-                        className={`min-h-[40px] inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-full transition-colors cursor-pointer ${
+                        className={`min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                           isActive
-                            ? 'bg-[#0D9488] text-white'
-                            : 'bg-[#162642] text-white hover:bg-[#1E3356] dark:bg-[#1B3358] dark:hover:bg-[#23406E]'
+                            ? 'bg-[#0B8A7E] text-white'
+                            : 'bg-[#0F1D32] text-white hover:bg-[#1B2F4D] dark:bg-[#1B2A42] dark:hover:bg-[#243958]'
                         }`}
                       >
                         {isActive && <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -727,12 +803,37 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           onSelectProfile(profile.id);
                           onOpenReplaceDevice();
                         }}
-                        className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#162642] bg-[#F3F7F9] hover:bg-[#E4EDF2] dark:text-[#E2ECF5] dark:bg-[#162947] dark:hover:bg-[#1D355B] rounded-full transition-colors cursor-pointer"
+                        className="min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] hover:bg-[#EDF3F7] border border-[#E1E8EE] dark:text-[#E2E8F0] dark:bg-[#09111E] dark:hover:bg-[#122038] dark:border-[#1B2A42] rounded-lg transition-colors cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                         <span>{t.moduleBtn}</span>
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setCalendarProfileId(profile.id)}
+                      className="min-h-[36px] w-full inline-flex items-center justify-between gap-2 px-3 py-1.5 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#D8F2EE] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:hover:bg-[#103835] dark:border-[#134E4A] rounded-lg transition-colors cursor-pointer"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <CalendarCheck2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        <span>{t.vaccinationCalendarBtn}</span>
+                      </span>
+                      {profileVaxCal.autoReminders.length > 0 ? (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#FEF7EC] text-[#B45309] border border-[#FCDCA8] dark:bg-[#451A03] dark:text-[#FDE68A] dark:border-[#78350F] tabular-nums">
+                          {profileVaxCal.autoReminders.length}{' '}
+                          {isAr
+                            ? 'تذكير'
+                            : profileVaxCal.autoReminders.length > 1
+                            ? 'rappels'
+                            : 'rappel'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium opacity-80">
+                          {isAr ? 'مكتمل' : 'À jour'}
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </article>
               );
@@ -743,15 +844,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           {otherProfiles.length > 0 && (
             <section className="biotemp-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 transition-colors">
               <div>
-                <h2 className="text-sm font-bold text-[#162642] dark:text-[#F1F6FA] flex items-center gap-2">
-                  <ArrowRightLeft className="w-4 h-4 text-[#0D9488] dark:text-[#2DD4BF]" aria-hidden="true" />
+                <h2 className="text-sm font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-2">
+                  <ArrowRightLeft className="w-4 h-4 text-[#0B8A7E] dark:text-[#2DD4BF]" aria-hidden="true" />
                   <span>{t.reassignTitle}</span>
                 </h2>
-                <p className="mt-1 text-xs text-[#526675] dark:text-[#94ACC4]">
+                <p className="mt-1 text-xs text-[#475B70] dark:text-[#9DB0C6]">
                   {t.reassignDesc} ({activeProfile.name})
                 </p>
                 {reassignNotice && (
-                  <p className="mt-1.5 text-xs font-semibold text-[#0F766E] dark:text-[#5EEAD4]">
+                  <p className="mt-1.5 text-xs font-semibold text-[#087066] dark:text-[#5EEAD4]">
                     {reassignNotice}
                   </p>
                 )}
@@ -759,10 +860,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <select
-                  aria-label="Profil destinataire"
+                  aria-label={isAr ? 'الملف المستلم' : 'Profil destinataire'}
                   value={reassignTargetId || otherProfiles[0]?.id}
                   onChange={(e) => setReassignTargetId(e.target.value)}
-                  className="min-h-[40px] px-3 py-1.5 text-xs font-semibold text-[#162642] bg-[#F3F7F9] border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0B172B] dark:border-[#1E3354] rounded-full"
+                  className="min-h-[38px] px-3 py-1.5 text-xs font-semibold text-[#0F1D32] bg-[#F8FAFC] border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#09111E] dark:border-[#1B2A42] rounded-lg"
                 >
                   {otherProfiles.map((op) => (
                     <option key={op.id} value={op.id}>
@@ -773,7 +874,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <button
                   type="button"
                   onClick={handleReassign}
-                  className="min-h-[40px] px-4 py-2 text-xs font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] rounded-full transition-colors cursor-pointer"
+                  className="min-h-[38px] px-4 py-2 text-xs font-semibold text-white bg-[#0F1D32] hover:bg-[#1B2F4D] dark:bg-[#0B8A7E] dark:hover:bg-[#087066] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   {t.transferBtn}
                 </button>
@@ -824,60 +925,76 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         />
       ) : (
         /* TAB: SANTÉ GLOBALE */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Carnet de vaccinations */}
           <section
-            aria-label="Carnet de vaccinations"
+            aria-label={isAr ? 'دفتر التطعيمات' : 'Carnet de vaccinations'}
             className="lg:col-span-6 biotemp-card p-5 sm:p-6 space-y-5 transition-colors"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC]">
-                  Suivi vaccinal
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
+                  {t.vaccinationsSubtitle}
                 </p>
-                <h2 className="text-lg font-bold text-[#162642] dark:text-[#F1F6FA] flex items-center gap-2">
-                  <Syringe className="w-5 h-5 text-[#0D9488] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
-                  <span>Vaccinations — {activeProfile.name}</span>
+                <h2 className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-2 mt-0.5">
+                  <Syringe className="w-5 h-5 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
+                  <span>
+                    {t.vaccinationsTitle} — {activeProfile.name}
+                  </span>
                 </h2>
               </div>
-              <span className="px-3 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E] border border-[#CCFBF1] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59] text-xs font-semibold tabular-nums">
-                {sortedVaccinations.length} vaccin{sortedVaccinations.length > 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCalendarProfileId(activeProfile.id)}
+                  className="min-h-[32px] inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-[#087066] bg-[#EDF9F7] hover:bg-[#D8F2EE] border border-[#BEEAE4] dark:text-[#5EEAD4] dark:bg-[#0A2624] dark:hover:bg-[#103835] dark:border-[#134E4A] rounded-lg transition-colors cursor-pointer"
+                >
+                  <CalendarCheck2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>{t.vaccinationCalendarBtn}</span>
+                </button>
+                <span className="font-mono text-xs font-semibold text-[#087066] dark:text-[#5EEAD4] tabular-nums">
+                  {sortedVaccinations.length}{' '}
+                  {sortedVaccinations.length > 1 ? t.vaccinesWord : t.vaccineWord}
+                </span>
+              </div>
             </div>
 
             {/* Quick Vaccine Presets */}
             <div className="flex flex-wrap gap-1.5">
-              {VACCINE_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setVaccineName(preset)}
-                  className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#F3F7F9] hover:bg-[#E4EDF2] text-[#476074] dark:bg-[#0B172B] dark:hover:bg-[#162947] dark:text-[#94ACC4] border border-[#E2ECF0] dark:border-[#1E3354] transition-colors cursor-pointer"
-                >
-                  + {preset}
-                </button>
-              ))}
+              {VACCINE_PRESETS.map((preset) => {
+                const label = isAr ? preset.labelAr : preset.value;
+                return (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setVaccineName(label)}
+                    className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-[#F8FAFC] hover:bg-[#EDF3F7] text-[#475B70] dark:bg-[#09111E] dark:hover:bg-[#122038] dark:text-[#9DB0C6] border border-[#E1E8EE] dark:border-[#1B2A42] transition-colors cursor-pointer"
+                  >
+                    + {label}
+                  </button>
+                );
+              })}
             </div>
 
             <form
               onSubmit={handleAddVaccineSubmit}
-              className="p-4 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-3"
+              className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-3"
             >
               <div>
                 <label
                   htmlFor="vac-name"
-                  className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                  className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                 >
-                  Nom du vaccin
+                  {isAr ? 'اسم اللقاح' : 'Nom du vaccin'}
                 </label>
                 <input
                   id="vac-name"
                   type="text"
                   value={vaccineName}
                   onChange={(e) => setVaccineName(e.target.value)}
-                  placeholder="Ex. : Hexavalent — Dose 3"
+                  placeholder={isAr ? 'مثال: اللقاح السداسي — الجرعة 3' : 'Ex. : Hexavalent — Dose 3'}
                   required
-                  className="w-full min-h-[40px] px-3 py-2 text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] dark:placeholder:text-[#6B849E] rounded-xl"
+                  className="w-full min-h-[38px] px-3 py-1.5 text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] dark:placeholder:text-[#64798F] rounded-lg"
                 />
               </div>
 
@@ -885,9 +1002,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div>
                   <label
                     htmlFor="vac-date"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Date d&apos;administration
+                    {isAr ? 'تاريخ التطعيم' : "Date d'administration"}
                   </label>
                   <input
                     id="vac-date"
@@ -895,22 +1012,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     value={administeredDate}
                     onChange={(e) => setAdministeredDate(e.target.value)}
                     required
-                    className="w-full min-h-[40px] px-3 py-2 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-3 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="vac-next"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Prochain rappel (optionnel)
+                    {isAr ? 'الجرعة التذكيرية القادمة (اختياري)' : 'Prochain rappel (optionnel)'}
                   </label>
                   <input
                     id="vac-next"
                     type="date"
                     value={nextDueDate}
                     onChange={(e) => setNextDueDate(e.target.value)}
-                    className="w-full min-h-[40px] px-3 py-2 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-3 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
               </div>
@@ -918,49 +1035,56 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
-                  aria-label="Numéro de lot ou remarque"
+                  aria-label={isAr ? 'رقم الدفعة أو ملاحظة' : 'Numéro de lot ou remarque'}
                   value={lotOrNote}
                   onChange={(e) => setLotOrNote(e.target.value)}
-                  placeholder="Lot, bras ou remarque (optionnel)"
-                  className="flex-1 min-h-[40px] px-3 py-2 text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] dark:placeholder:text-[#6B849E] rounded-xl"
+                  placeholder={isAr ? 'الدفعة، الذراع أو ملاحظة (اختياري)' : 'Lot, bras ou remarque (optionnel)'}
+                  className="flex-1 min-h-[38px] px-3 py-1.5 text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] dark:placeholder:text-[#64798F] rounded-lg"
                 />
                 <button
                   type="submit"
-                  className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#0D9488] hover:bg-[#0F766E] rounded-xl transition-colors cursor-pointer shrink-0"
+                  className="min-h-[38px] inline-flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#0B8A7E] hover:bg-[#087066] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" aria-hidden="true" />
-                  <span>Enregistrer</span>
+                  <span>{isAr ? 'حفظ' : 'Enregistrer'}</span>
                 </button>
               </div>
             </form>
 
             <div className="space-y-2.5">
               {sortedVaccinations.length === 0 ? (
-                <p className="text-xs text-[#647B8C] dark:text-[#8BA3BC] py-4 text-center">
-                  Aucune vaccination enregistrée pour {activeProfile.name}.
+                <p className="text-xs text-[#64798F] dark:text-[#7B91A8] py-4 text-center">
+                  {isAr
+                    ? `لا توجد تطعيمات مسجلة لـ ${activeProfile.name}.`
+                    : `Aucune vaccination enregistrée pour ${activeProfile.name}.`}
                 </p>
               ) : (
                 sortedVaccinations.map((vac) => (
                   <div
                     key={vac.id}
-                    className="p-3.5 rounded-2xl bg-white border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] flex items-start justify-between gap-3"
+                    className="p-3.5 rounded-xl bg-white border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] flex items-start justify-between gap-3"
                   >
                     <div className="space-y-1 min-w-0">
-                      <p className="text-sm font-bold text-[#162642] dark:text-[#F1F6FA]">
+                      <p className="text-sm font-bold text-[#0F1D32] dark:text-[#F1F5F9]">
                         {vac.vaccineName}
                       </p>
                       <div className="flex flex-wrap items-center gap-2 text-xs tabular-nums">
-                        <span className="font-mono text-[#0F766E] dark:text-[#5EEAD4] font-semibold">
-                          Fait le {formatIsoDateFr(vac.administeredDate)}
+                        <span className="font-mono text-[#087066] dark:text-[#5EEAD4] font-semibold">
+                          {isAr ? 'تاريخ التلقي:' : 'Fait le'}{' '}
+                          {formatIsoDateFr(vac.administeredDate, language)}
                         </span>
                         {vac.nextDueDate && (
-                          <span className="px-2 py-0.5 rounded-full bg-[#FFF7ED] text-[#C2410C] border border-[#FED7AA] dark:bg-[#2C1C12] dark:text-[#FDBA74] dark:border-[#7C2D12] text-[11px] font-medium">
-                            Rappel : {formatIsoDateFr(vac.nextDueDate)}
-                          </span>
+                          <>
+                            <span className="text-[#CBD5E1] dark:text-[#334155]">·</span>
+                            <span className="font-mono text-[#B45309] dark:text-[#FDE68A] text-[11px] font-semibold">
+                              {isAr ? 'التذكير:' : 'Rappel :'}{' '}
+                              {formatIsoDateFr(vac.nextDueDate, language)}
+                            </span>
+                          </>
                         )}
                       </div>
                       {vac.lotOrNote && (
-                        <p className="text-xs text-[#526675] dark:text-[#94ACC4]">
+                        <p className="text-xs text-[#475B70] dark:text-[#9DB0C6]">
                           {vac.lotOrNote}
                         </p>
                       )}
@@ -969,8 +1093,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     <button
                       type="button"
                       onClick={() => onDeleteVaccination(activeProfile.id, vac.id)}
-                      aria-label={`Supprimer ${vac.vaccineName}`}
-                      className="p-1.5 rounded-lg text-[#647B8C] hover:text-[#E11D48] hover:bg-[#FFF1F2] dark:text-[#8BA3BC] dark:hover:text-[#FDA4AF] dark:hover:bg-[#2F1320] transition-colors cursor-pointer shrink-0"
+                      aria-label={`${isAr ? 'حذف' : 'Supprimer'} ${vac.vaccineName}`}
+                      className="p-1.5 rounded-lg text-[#64798F] hover:text-[#D91E43] hover:bg-[#FEF1F3] dark:text-[#7B91A8] dark:hover:text-[#FDA4AF] dark:hover:bg-[#2A0E17] transition-colors cursor-pointer shrink-0"
                     >
                       <Trash2 className="w-4 h-4" aria-hidden="true" />
                     </button>
@@ -982,70 +1106,75 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
           {/* Rappels médicaux non liés à la température */}
           <section
-            aria-label="Rappels médicaux hors température"
+            aria-label={isAr ? 'التذكيرات الطبية غير المرتبطة بالحرارة' : 'Rappels médicaux hors température'}
             className="lg:col-span-6 biotemp-card p-5 sm:p-6 space-y-5 transition-colors"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-medium text-[#647B8C] dark:text-[#8BA3BC]">
-                  Rendez-vous &amp; traitements hors température
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#64798F] dark:text-[#7B91A8]">
+                  {t.remindersSubtitle}
                 </p>
-                <h2 className="text-lg font-bold text-[#162642] dark:text-[#F1F6FA] flex items-center gap-2">
-                  <CalendarClock className="w-5 h-5 text-[#0D9488] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
-                  <span>Rappels médicaux — {activeProfile.name}</span>
+                <h2 className="text-lg font-bold text-[#0F1D32] dark:text-[#F1F5F9] flex items-center gap-2 mt-0.5">
+                  <CalendarClock className="w-5 h-5 text-[#0B8A7E] dark:text-[#2DD4BF] shrink-0" aria-hidden="true" />
+                  <span>
+                    {t.remindersTitle} — {activeProfile.name}
+                  </span>
                 </h2>
               </div>
-              <span className="px-3 py-1 rounded-full bg-[#F3F7F9] text-[#162642] border border-[#DCE6EA] dark:bg-[#162947] dark:text-[#E2ECF5] dark:border-[#243E63] text-xs font-semibold tabular-nums">
-                {pendingRemindersCount} à venir
+              <span className="font-mono text-xs font-semibold text-[#475B70] dark:text-[#9DB0C6] tabular-nums">
+                {pendingRemindersCount} {isAr ? 'قادمة' : 'à venir'}
               </span>
             </div>
 
             {/* Quick Reminder Presets */}
             <div className="flex flex-wrap gap-1.5">
-              {REMINDER_PRESETS.map((preset) => (
-                <button
-                  key={preset.title}
-                  type="button"
-                  onClick={() => {
-                    setReminderTitle(preset.title);
-                    setReminderCategory(preset.category);
-                  }}
-                  className="px-2.5 py-1 text-[11px] font-medium rounded-full bg-[#F3F7F9] hover:bg-[#E4EDF2] text-[#476074] dark:bg-[#0B172B] dark:hover:bg-[#162947] dark:text-[#94ACC4] border border-[#E2ECF0] dark:border-[#1E3354] transition-colors cursor-pointer"
-                >
-                  + {preset.title}
-                </button>
-              ))}
+              {REMINDER_PRESETS.map((preset) => {
+                const label = isAr ? preset.titleAr : preset.title;
+                return (
+                  <button
+                    key={preset.title}
+                    type="button"
+                    onClick={() => {
+                      setReminderTitle(label);
+                      setReminderCategory(preset.category);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-[#F8FAFC] hover:bg-[#EDF3F7] text-[#475B70] dark:bg-[#09111E] dark:hover:bg-[#122038] dark:text-[#9DB0C6] border border-[#E1E8EE] dark:border-[#1B2A42] transition-colors cursor-pointer"
+                  >
+                    + {label}
+                  </button>
+                );
+              })}
             </div>
 
             <form
               onSubmit={handleAddReminderSubmit}
-              className="p-4 rounded-2xl bg-[#F7FAFB] border border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354] space-y-3"
+              className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42] space-y-3"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label
                     htmlFor="rem-title"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Objet du rappel
+                    {isAr ? 'موضوع التذكير' : 'Objet du rappel'}
                   </label>
                   <input
                     id="rem-title"
                     type="text"
                     value={reminderTitle}
                     onChange={(e) => setReminderTitle(e.target.value)}
-                    placeholder="Ex. : Visite pédiatre 12e mois"
+                    placeholder={isAr ? 'مثال: زيارة طبيب الأطفال الشهر 12' : 'Ex. : Visite pédiatre 12e mois'}
                     required
-                    className="w-full min-h-[40px] px-3 py-2 text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] dark:placeholder:text-[#6B849E] rounded-xl"
+                    className="w-full min-h-[38px] px-3 py-1.5 text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] dark:placeholder:text-[#64798F] rounded-lg"
                   />
                 </div>
 
                 <div>
                   <label
                     htmlFor="rem-cat"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Catégorie
+                    {isAr ? 'الفئة' : 'Catégorie'}
                   </label>
                   <select
                     id="rem-cat"
@@ -1053,11 +1182,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     onChange={(e) =>
                       setReminderCategory(e.target.value as HealthReminderCategory)
                     }
-                    className="w-full min-h-[40px] px-3 py-2 text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-3 py-1.5 text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   >
                     {REMINDER_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
+                      <option key={cat.value} value={cat.value}>
+                        {isAr ? cat.labelAr : cat.value}
                       </option>
                     ))}
                   </select>
@@ -1068,9 +1197,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div>
                   <label
                     htmlFor="rem-date"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Date prévue
+                    {isAr ? 'التاريخ المحدد' : 'Date prévue'}
                   </label>
                   <input
                     id="rem-date"
@@ -1078,22 +1207,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     value={reminderDate}
                     onChange={(e) => setReminderDate(e.target.value)}
                     required
-                    className="w-full min-h-[40px] px-3 py-2 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-3 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
                 <div>
                   <label
                     htmlFor="rem-time"
-                    className="block text-xs font-medium text-[#476074] dark:text-[#94ACC4] mb-1"
+                    className="block text-xs font-medium text-[#475B70] dark:text-[#9DB0C6] mb-1"
                   >
-                    Heure (optionnelle)
+                    {isAr ? 'الساعة (اختياري)' : 'Heure (optionnelle)'}
                   </label>
                   <input
                     id="rem-time"
                     type="time"
                     value={reminderTime}
                     onChange={(e) => setReminderTime(e.target.value)}
-                    className="w-full min-h-[40px] px-3 py-2 font-mono text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] rounded-xl"
+                    className="w-full min-h-[38px] px-3 py-1.5 font-mono text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] rounded-lg"
                   />
                 </div>
               </div>
@@ -1101,97 +1230,123 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
-                  aria-label="Note pour le rappel médical"
+                  aria-label={isAr ? 'ملاحظة للتذكير الطبي' : 'Note pour le rappel médical'}
                   value={reminderNotes}
                   onChange={(e) => setReminderNotes(e.target.value)}
-                  placeholder="Précision, médecin ou ordonnance (optionnel)"
-                  className="flex-1 min-h-[40px] px-3 py-2 text-xs text-[#162642] bg-white border border-[#DCE6EA] dark:text-[#F1F6FA] dark:bg-[#0F1E36] dark:border-[#1E3354] dark:placeholder:text-[#6B849E] rounded-xl"
+                  placeholder={
+                    isAr
+                      ? 'تفاصيل، اسم الطبيب أو الوصفة (اختياري)'
+                      : 'Précision, médecin ou ordonnance (optionnel)'
+                  }
+                  className="flex-1 min-h-[38px] px-3 py-1.5 text-xs text-[#0F1D32] bg-white border border-[#E1E8EE] dark:text-[#F1F5F9] dark:bg-[#0D1626] dark:border-[#1B2A42] dark:placeholder:text-[#64798F] rounded-lg"
                 />
                 <button
                   type="submit"
-                  className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#162642] hover:bg-[#1E3356] dark:bg-[#0D9488] dark:hover:bg-[#0F766E] rounded-xl transition-colors cursor-pointer shrink-0"
+                  className="min-h-[38px] inline-flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#0F1D32] hover:bg-[#1B2F4D] dark:bg-[#0B8A7E] dark:hover:bg-[#087066] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" aria-hidden="true" />
-                  <span>Ajouter rappel</span>
+                  <span>{isAr ? 'إضافة تذكير' : 'Ajouter rappel'}</span>
                 </button>
               </div>
             </form>
 
             <div className="space-y-2.5">
               {sortedReminders.length === 0 ? (
-                <p className="text-xs text-[#647B8C] dark:text-[#8BA3BC] py-4 text-center">
-                  Aucun rappel médical enregistré pour {activeProfile.name}.
+                <p className="text-xs text-[#64798F] dark:text-[#7B91A8] py-4 text-center">
+                  {isAr
+                    ? `لا توجد تذكيرات طبية مسجلة لـ ${activeProfile.name}.`
+                    : `Aucun rappel médical enregistré pour ${activeProfile.name}.`}
                 </p>
               ) : (
-                sortedReminders.map((rem) => (
-                  <div
-                    key={rem.id}
-                    className={`p-3.5 rounded-2xl border flex items-start justify-between gap-3 transition-colors ${
-                      rem.completed
-                        ? 'bg-[#F8FAFA] border-[#E6EFF2] opacity-70 dark:bg-[#0A1424] dark:border-[#1A2D4A]'
-                        : 'bg-white border-[#E6EFF2] dark:bg-[#0B172B] dark:border-[#1E3354]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => onToggleHealthReminder(activeProfile.id, rem.id)}
-                        aria-label={
-                          rem.completed
-                            ? `Marquer ${rem.title} comme à faire`
-                            : `Marquer ${rem.title} comme effectué`
-                        }
-                        className={`mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
-                          rem.completed
-                            ? 'bg-[#0D9488] border-[#0D9488] text-white'
-                            : 'bg-white border-[#C5D5DD] hover:border-[#0D9488] dark:bg-[#0F1E36] dark:border-[#2E4B73]'
-                        }`}
-                      >
-                        {rem.completed && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
-                      </button>
-
-                      <div className="space-y-1 min-w-0">
-                        <p
-                          className={`text-sm font-bold ${
+                sortedReminders.map((rem) => {
+                  const catObj = REMINDER_CATEGORIES.find((c) => c.value === rem.category);
+                  const catLabel = isAr && catObj ? catObj.labelAr : rem.category;
+                  return (
+                    <div
+                      key={rem.id}
+                      className={`p-3.5 rounded-xl border flex items-start justify-between gap-3 transition-colors ${
+                        rem.completed
+                          ? 'bg-[#F8FAFC] border-[#E1E8EE] opacity-65 dark:bg-[#09111E] dark:border-[#1B2A42]'
+                          : 'bg-white border-[#E1E8EE] dark:bg-[#09111E] dark:border-[#1B2A42]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => onToggleHealthReminder(activeProfile.id, rem.id)}
+                          aria-label={
                             rem.completed
-                              ? 'line-through text-[#647B8C] dark:text-[#8BA3BC]'
-                              : 'text-[#162642] dark:text-[#F1F6FA]'
+                              ? isAr
+                                ? `تعيين ${rem.title} كغير مكتمل`
+                                : `Marquer ${rem.title} comme à faire`
+                              : isAr
+                              ? `تعيين ${rem.title} كمكتمل`
+                              : `Marquer ${rem.title} comme effectué`
+                          }
+                          className={`mt-0.5 w-5.5 h-5.5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                            rem.completed
+                              ? 'bg-[#0B8A7E] border-[#0B8A7E] text-white'
+                              : 'bg-white border-[#C2D0DC] hover:border-[#0B8A7E] dark:bg-[#0D1626] dark:border-[#2C456E]'
                           }`}
                         >
-                          {rem.title}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 text-xs tabular-nums">
-                          <span className="px-2 py-0.5 rounded-full bg-[#F0FDFA] text-[#0F766E] border border-[#CCFBF1] dark:bg-[#0D2B2C] dark:text-[#5EEAD4] dark:border-[#115E59] text-[11px] font-semibold">
-                            {rem.category}
-                          </span>
-                          <span className="font-mono text-[#354E52] dark:text-[#B0C4D8]">
-                            {formatIsoDateFr(rem.dueDate)}
-                            {rem.time ? ` · ${rem.time}` : ''}
-                          </span>
-                        </div>
-                        {rem.notes && (
-                          <p className="text-xs text-[#526675] dark:text-[#94ACC4]">
-                            {rem.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                          {rem.completed && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => onDeleteHealthReminder(activeProfile.id, rem.id)}
-                      aria-label={`Supprimer ${rem.title}`}
-                      className="p-1.5 rounded-lg text-[#647B8C] hover:text-[#E11D48] hover:bg-[#FFF1F2] dark:text-[#8BA3BC] dark:hover:text-[#FDA4AF] dark:hover:bg-[#2F1320] transition-colors cursor-pointer shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                ))
+                        <div className="space-y-1 min-w-0">
+                          <p
+                            className={`text-sm font-bold ${
+                              rem.completed
+                                ? 'line-through text-[#64798F] dark:text-[#7B91A8]'
+                                : 'text-[#0F1D32] dark:text-[#F1F5F9]'
+                            }`}
+                          >
+                            {rem.title}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs tabular-nums">
+                            <span className="text-[11px] font-semibold text-[#087066] dark:text-[#5EEAD4]">
+                              {catLabel}
+                            </span>
+                            <span className="text-[#CBD5E1] dark:text-[#334155]">·</span>
+                            <span className="font-mono text-[#475B70] dark:text-[#9DB0C6]">
+                              {formatIsoDateFr(rem.dueDate, language)}
+                              {rem.time ? ` · ${rem.time}` : ''}
+                            </span>
+                          </div>
+                          {rem.notes && (
+                            <p className="text-xs text-[#475B70] dark:text-[#9DB0C6]">
+                              {rem.notes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onDeleteHealthReminder(activeProfile.id, rem.id)}
+                        aria-label={`${isAr ? 'حذف' : 'Supprimer'} ${rem.title}`}
+                        className="p-1.5 rounded-lg text-[#64798F] hover:text-[#D91E43] hover:bg-[#FEF1F3] dark:text-[#7B91A8] dark:hover:text-[#FDA4AF] dark:hover:bg-[#2A0E17] transition-colors cursor-pointer shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </section>
         </div>
       )}
+
+      <VaccinationCalendarModal
+        isOpen={calendarProfileId !== null}
+        language={language}
+        profiles={profiles}
+        initialProfileId={calendarProfileId ?? activeProfile.id}
+        onClose={() => setCalendarProfileId(null)}
+        onUpdateBirthDate={onUpdateBirthDate}
+        onAddVaccination={onAddVaccination}
+        onAddHealthReminder={onAddHealthReminder}
+      />
     </div>
   );
 };
