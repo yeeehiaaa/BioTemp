@@ -1,0 +1,8 @@
+{
+  "name": "BioTemp",
+  "description": "Système de surveillance thermique continue pour enfants et adultes : suivi BLE en direct, mémoire interne tampon, relais domestique, multi-profils et journal médical.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
